@@ -342,6 +342,7 @@ FUXIRAMDISK: no volume; hob=1 base=0xC4C29B14
 | --- | --- |
 | `boot-uefi-hello-dump.img` | 打印 `initrd` 的 `start..end`、头 32 字节 hexdump，并扫描 initrd 所在的内存描述符 |
 | `boot-uefi-hello-64.img` | 同样固件，但 payload 只有 **64 MiB**，用来验证 ABL 是否对 ramdisk 大小有限制 |
+| `boot-uefi-hello-64gz.img` | ramdisk 字段是 **gzip(64 MiB FAT)**（压缩后 77 KB）：有些 ABL 期待压缩 ramdisk 并解压到 initrd-start |
 
 真实 payload 也可以一键缩小：`apply-fixes.py --payload-size 64` 会把 `[payload] size_mib` 改成 64
 （内核约 46 MB，64 MiB 卷放得下）。
@@ -352,8 +353,16 @@ FUXIRAMDISK: no volume; hob=1 base=0xC4C29B14
 FUXIRAMDISK: chosen initrd A02B5000..A??????? size=...
 FUXIRAMDISK: [A02B5000] eb3c90... / 00000000 ...
 FUXIRAMDISK: initrd region 89800000..a2a00000 type=0
+FUXIRAMDISK: hint region 80000000..c0000000 type=...     ← FD 缓冲所在描述符
 FUXIRAMDISK: payload at ... in the initrd region      ← 命中
+FUXIRAMDISK: payload at ... in the hint region        ← 命中
 ```
+
+三张镜像按顺序试：
+
+1. `hello-dump`（192 MiB）：看 `initrd` 处到底有没有数据；
+2. `hello-64`（64 MiB）：全 0 的话，验证是不是大小限制；
+3. `hello-64gz`（1.9 MB）：验证 ABL 是不是期待压缩 ramdisk。
 
 ## 2. 测试 B：full 镜像（带 XNU）
 

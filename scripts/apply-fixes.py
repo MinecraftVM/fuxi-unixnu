@@ -579,6 +579,46 @@ def enable_ramdisk_full(uefi: Path) -> None:
       Hob.Raw = GET_NEXT_HOB (Hob);
     }
   }
+  if ((mVolumeBase == NULL) && mHintSeen) {
+    EFI_STATUS             MapStatus;
+    UINTN                  MapSize = 0;
+    UINTN                  MapKey;
+    UINTN                  DescSize;
+    UINT32                 DescVersion;
+    EFI_MEMORY_DESCRIPTOR  *Map;
+    MapStatus = gBS->GetMemoryMap (&MapSize, NULL, &MapKey, &DescSize, &DescVersion);
+    MapSize += 64 * DescSize;
+    Map = AllocatePool (MapSize);
+    if (Map != NULL) {
+      MapStatus = gBS->GetMemoryMap (&MapSize, Map, &MapKey, &DescSize, &DescVersion);
+      if (!EFI_ERROR (MapStatus)) {
+        UINTN  Index;
+        for (Index = 0; Index < MapSize / DescSize; Index++) {
+          EFI_MEMORY_DESCRIPTOR  *Desc = (EFI_MEMORY_DESCRIPTOR *)((UINT8 *)Map + Index * DescSize);
+          UINT64                 RegionStart = Desc->PhysicalStart;
+          UINT64                 RegionEnd   = RegionStart + (Desc->NumberOfPages << 12);
+          if ((mHintValue >= RegionStart) && (mHintValue < RegionEnd)) {
+            UINT64  Probe;
+            UINT64  Total = 0;
+            DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: hint region %lx..%lx type=%u\n", RegionStart, RegionEnd, Desc->Type));
+            if (RegionEnd - RegionStart > 0x40000000ULL) {
+              RegionEnd = RegionStart + 0x40000000ULL;
+            }
+            for (Probe = RegionStart; Probe + FUXI_BLOCK_SIZE <= RegionEnd; Probe += FUXI_BLOCK_SIZE) {
+              if (IsPayloadVolume ((UINT8 *)(UINTN)Probe, &Total)) {
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx in the hint region\n", Probe));
+                mVolumeBase  = (UINT8 *)(UINTN)Probe;
+                mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+      FreePool (Map);
+    }
+  }
   if (mVolumeBase == NULL) {
     UINT64  Probe;
     UINT64  Total;
