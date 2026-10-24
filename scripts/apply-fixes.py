@@ -328,6 +328,139 @@ def enable_ramdisk_scan(uefi: Path) -> None:
     print(f"{source}: hint scan now walks upwards")
 
 
+def enable_memmap_dump(uefi: Path) -> None:
+    """Print the large UEFI memory descriptors to the framebuffer console.
+
+    The payload has not shown up in the ranges tried so far. The memory map says
+    where large RAM regions actually are (and which type they carry), which is what
+    decides where a 192 MiB ramdisk can sit. Only regions of 16 MiB and up are
+    printed so the screen keeps the FUXIRAMDISK lines visible.
+    """
+    source = uefi / "Platforms/Xiaomi/fuxiPkg/Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.c"
+    text, crlf = read_text(source)
+    if "FUXIMAP:" in text:
+        print(f"{source}: memory map dump already present")
+        return
+    if "#include <Library/DebugLib.h>" not in text:
+        text = text.replace("#include <Uefi.h>\n", "#include <Uefi.h>\n#include <Library/DebugLib.h>\n", 1)
+    anchor = "  if (mVolumeBase == NULL) {"
+    dump = (
+        "  {\n"
+        "    UINTN  MapSize = 0;\n"
+        "    UINTN  MapKey;\n"
+        "    UINTN  DescSize;\n"
+        "    UINT32 DescVersion;\n"
+        "    EFI_MEMORY_DESCRIPTOR  *MemMap;\n"
+        "\n"
+        "    gBS->GetMemoryMap (&MapSize, NULL, &MapKey, &DescSize, &DescVersion);\n"
+        "    MapSize += 32 * DescSize;\n"
+        "    MemMap = AllocatePool (MapSize);\n"
+        "    if ((MemMap != NULL) &&\n"
+        "        !EFI_ERROR (gBS->GetMemoryMap (&MapSize, MemMap, &MapKey, &DescSize, &DescVersion))) {\n"
+        "      UINTN  Count = MapSize / DescSize;\n"
+        "      UINTN  Index;\n"
+        "      UINTN  Shown = 0;\n"
+        "\n"
+        "      DEBUG ((DEBUG_ERROR, \"FUXIMAP: %lu descriptors, showing >=16 MiB\\n\", (UINT64)Count));\n"
+        "      for (Index = 0; Index < Count; Index++) {\n"
+        "        EFI_MEMORY_DESCRIPTOR  *Entry = (EFI_MEMORY_DESCRIPTOR *)((UINT8 *)MemMap + Index * DescSize);\n"
+        "        if ((Entry->NumberOfPages < (0x1000000 / EFI_PAGE_SIZE)) || (Shown >= 12)) {\n"
+        "          continue;\n"
+        "        }\n"
+        "        DEBUG ((DEBUG_ERROR, \"FUXIMAP: %lx %lu MiB type %u attrs %lx\\n\",\n"
+        "                (UINT64)Entry->PhysicalStart, (UINT64)(Entry->NumberOfPages >> 8),\n"
+        "                Entry->Type, (UINT64)Entry->Attribute));\n"
+        "        Shown++;\n"
+        "      }\n"
+        "      FreePool (MemMap);\n"
+        "    }\n"
+        "  }\n"
+        "  if (mVolumeBase == NULL) {")
+    if anchor not in text:
+        raise SystemExit(f"{source}: no-volume anchor not found")
+    text = text.replace(anchor, dump, 1)
+    write_text(source, text, crlf)
+    print(f"{source}: memory map dump added")
+
+
+def enable_dt_chosen(uefi: Path) -> None:
+    """Print the live device tree's /chosen ramdisk range from x0.
+
+    SEC hands the previous stage's x0 to DXE in gSiliciumEntryArgHobGuid; SEC itself
+    treats it as the device tree only when the magic and size check pass. If the ABL
+    patched /chosen for this boot, linux,initrd-start/end name the ramdisk it loaded,
+    which is the address FuxiRamDiskDxe is looking for. The driver prints it through
+    DEBUG, which reaches the panel through FrameBufferSerialPortLib.
+    """
+    package = uefi / "Platforms/Xiaomi/fuxiPkg"
+    source = package / "Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.c"
+    inf = package / "Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.inf"
+    text, crlf = read_text(source)
+    if "FUXIDT:" in text:
+        print(f"{source}: DT chosen dump already present")
+        return
+    if "#include <Library/FdtLib.h>" not in text:
+        text = text.replace("#include <Library/DebugLib.h>\n",
+                            "#include <Library/DebugLib.h>\n#include <Library/FdtLib.h>\n", 1)
+    anchor = "  {\n    UINTN  MapSize = 0;"
+    block = (
+        "  {\n"
+        "    EFI_PEI_HOB_POINTERS   Hob;\n"
+        "    STATIC CONST EFI_GUID  EntryArgGuid = { 0xDAEE82E6, 0x8090, 0x4E72, { 0xBF, 0xB9, 0x78, 0xC1, 0x3C, 0xD4, 0xE3, 0x59 } };\n"
+        "\n"
+        "    Hob.Raw = GetHobList ();\n"
+        "    while (!END_OF_HOB_LIST (Hob)) {\n"
+        "      if ((Hob.Header->HobType == EFI_HOB_TYPE_GUID_EXTENSION) &&\n"
+        "          (CompareGuid (&Hob.Guid->Name, &EntryArgGuid))) {\n"
+        "        UINT64  Dt = *(UINT64 *)(Hob.Guid + 1);\n"
+        "        DEBUG ((DEBUG_ERROR, \"FUXIDT: entry x0=%lx\\n\", Dt));\n"
+        "        if ((Dt != 0) && ((Dt & 3) == 0) && (FdtCheckHeader ((CONST VOID *)(UINTN)Dt) == 0)) {\n"
+        "          INT32  Node = FdtPathOffset ((CONST VOID *)(UINTN)Dt, \"/chosen\");\n"
+        "          DEBUG ((DEBUG_ERROR, \"FUXIDT: fdt ok, chosen=%d\\n\", Node));\n"
+        "          if (Node >= 0) {\n"
+        "            INT32        Len;\n"
+        "            CONST VOID   *P;\n"
+        "            UINT64       Value;\n"
+        "\n"
+        "            Len = 0;\n"
+        "            P = FdtGetProp ((CONST VOID *)(UINTN)Dt, Node, \"linux,initrd-start\", &Len);\n"
+        "            if (P != NULL) {\n"
+        "              Value = (Len >= 8) ? Fdt64ToCpu (*(CONST UINT64 *)P) : (UINT64)Fdt32ToCpu (*(CONST UINT32 *)P);\n"
+        "              DEBUG ((DEBUG_ERROR, \"FUXIDT: initrd-start=%lx len=%d\\n\", Value, Len));\n"
+        "            }\n"
+        "            Len = 0;\n"
+        "            P = FdtGetProp ((CONST VOID *)(UINTN)Dt, Node, \"linux,initrd-end\", &Len);\n"
+        "            if (P != NULL) {\n"
+        "              Value = (Len >= 8) ? Fdt64ToCpu (*(CONST UINT64 *)P) : (UINT64)Fdt32ToCpu (*(CONST UINT32 *)P);\n"
+        "              DEBUG ((DEBUG_ERROR, \"FUXIDT: initrd-end=%lx len=%d\\n\", Value, Len));\n"
+        "            }\n"
+        "            Len = 0;\n"
+        "            P = FdtGetProp ((CONST VOID *)(UINTN)Dt, Node, \"bootargs\", &Len);\n"
+        "            if (P != NULL) {\n"
+        "              DEBUG ((DEBUG_ERROR, \"FUXIDT: bootargs=%.64a\\n\", (CONST CHAR8 *)P));\n"
+        "            }\n"
+        "          }\n"
+        "        } else {\n"
+        "          DEBUG ((DEBUG_ERROR, \"FUXIDT: x0 is not an FDT\\n\"));\n"
+        "        }\n"
+        "      }\n"
+        "      Hob.Raw = GET_NEXT_HOB (Hob);\n"
+        "    }\n"
+        "  }\n"
+        "  {\n    UINTN  MapSize = 0;")
+    if anchor not in text:
+        raise SystemExit(f"{source}: memory map anchor not found")
+    text = text.replace(anchor, block, 1)
+    write_text(source, text, crlf)
+    print(f"{source}: /chosen dump added")
+
+    inf_text, inf_crlf = read_text(inf)
+    if "FdtLib" not in inf_text:
+        anchor = "[LibraryClasses]\n"
+        write_text(inf, inf_text.replace(anchor, anchor + "  FdtLib\n", 1), inf_crlf)
+        print(f"{inf}: FdtLib added")
+
+
 def enable_debug_conout(uefi: Path) -> None:
     """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
 
@@ -401,6 +534,10 @@ def main() -> int:
                         help="make FuxiRamDiskDxe log through DEBUG and stop it halting the boot")
     parser.add_argument("--ramdisk-scan", action="store_true",
                         help="scan upwards from the SEC payload hint (the ramdisk sits above the appened tree)")
+    parser.add_argument("--memmap", action="store_true",
+                        help="print the large memory descriptors to the framebuffer console")
+    parser.add_argument("--dtchosen", action="store_true",
+                        help="print /chosen linux,initrd-start/end from the DT the ABL handed over in x0")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -437,6 +574,10 @@ def main() -> int:
         enable_ramdisk_debug(Path(args.uefi))
     if args.ramdisk_scan:
         enable_ramdisk_scan(Path(args.uefi))
+    if args.memmap:
+        enable_memmap_dump(Path(args.uefi))
+    if args.dtchosen:
+        enable_dt_chosen(Path(args.uefi))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)

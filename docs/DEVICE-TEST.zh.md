@@ -171,6 +171,26 @@ FUXIRAMDISK: payload at 0x... (找到时)
 如果 `hob=0`，说明 SEC 根本没发布提示（x0 指向的 FDT 没通过 magic/大小检查），
 那就不是扫描方向的问题，要先修 SEC 的取值。
 
+## 1f. 已经能进 UniXNU 界面之后
+
+实测（2026-10-24）：用**不 halt 的 ramdisk 驱动**镜像，手机已经能进 UniXNU 界面。这说明：
+
+- BootShim → UEFI → DXE → BdsDxe → UniXNU 这条链是通的；
+- UniXNU 的 UI 能画出来（GOP/ConOut 工作）；
+- 之前的"卡死"确实就是 `FuxiRamDiskDxe` 找不到卷时的 `CpuDeadLoop()`。
+
+下一步是让 UniXNU 找到 payload 卷并列出条目。以下两个镜像都带 **192 MiB 的 hello payload**：
+
+| 镜像 | 固件里的扫描方向 |
+| --- | --- |
+| `boot-uefi-hello-down.img` | 上游的向下 256 MiB |
+| `boot-uefi-hello-up.img` | 向上 16 MiB（DT/ramdisk 在 kernel 字段之后） |
+
+预期：
+
+- 菜单里出现 **fuxi: UEFI hello (no XNU)** → 卷找到了，FAT/config/加载整条链在真机上通了；
+- 菜单里只有内置项（没有 hello）→ 卷没找到，把屏幕上的 `FUXIRAMDISK:` 行发回来。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；
