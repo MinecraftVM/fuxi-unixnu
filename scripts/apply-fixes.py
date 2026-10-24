@@ -599,6 +599,19 @@ def enable_ramdisk_full(uefi: Path) -> None:
       Hob.Raw = GET_NEXT_HOB (Hob);
     }
   }
+  if ((mVolumeBase == NULL) && mHintSeen && (mHintValue >= 0x40000000ULL)) {
+    UINT64  Probe;
+    UINT64  Total;
+    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: scanning above the hint %lx..%lx\n", mHintValue, mHintValue + 0x08000000ULL));
+    for (Probe = mHintValue & ~(UINT64)(FUXI_BLOCK_SIZE - 1); Probe < mHintValue + 0x08000000ULL; Probe += FUXI_BLOCK_SIZE) {
+      if (IsPayloadVolume ((UINT8 *)(UINTN)Probe, &Total)) {
+        DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx above the hint\n", Probe));
+        mVolumeBase  = (UINT8 *)(UINTN)Probe;
+        mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+        break;
+      }
+    }
+  }
   if ((mVolumeBase == NULL) && mHintSeen) {
     EFI_STATUS             MapStatus;
     UINTN                  MapSize = 0;
