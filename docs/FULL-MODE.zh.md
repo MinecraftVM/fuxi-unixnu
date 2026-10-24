@@ -195,3 +195,22 @@ Boot progress requires the audited UFS/owner-root, Virtio and source-crypto buil
 
 工作流的 `config` 默认值已改为 `console`，Ubuntu 预检里的 `check-defconfig.py` 也会在 macOS 之前
 直接报出这个组合。
+### 8.3 链接需要的外部符号只有两个
+
+补丁序列里新增的 `extern` 声明一共 13 个，逐个核对后只有两个是**无条件**引用的：
+
+| 符号 | 提供者 |
+| --- | --- |
+| `native_legacy_display_probe` | `libLegacyStub.a`（`build-legacy-stub.py`） |
+| `native_legacy_display_late_probe` | 同上 |
+
+其余都在配置守卫里，console 配置下整体编译掉：
+
+```
+native_adreno_firmware_probe / native_adreno_pm4_probe / native_constants_probe
+native_smmu4k_probe / native_offline_gpu_publish / native_mobile_display_provider_probe
+native_mobile_graphics_client_probe / native_verified_root_probe / sheng_pmgr_run
+```
+
+`check-defconfig.py` 现在也会检查：`NATIVE_LEGACY_DISPLAY` 没开时，`EXTRA_LD_ARCHIVES` 必须指向
+`build/legacy-stub/libLegacyStub.a`，并且 board.toml 的归档列表里必须有 `build-legacy-stub.py`。

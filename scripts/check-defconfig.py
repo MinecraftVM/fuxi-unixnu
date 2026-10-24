@@ -101,9 +101,15 @@ def main() -> int:
     if enabled(values, "OWNER_ROOT_AUDIT"):
         need("VERIFIED_ROOT_PROBE", "the owner-root audit needs the verified-root probe")
 
+    # bsd_init references the two legacy display probes unconditionally, so any
+    # configuration without the real (post-prelink) display archive needs the stub.
+    extra = values.get("EXTRA_LD_ARCHIVES", "")
+    if not enabled(values, "NATIVE_LEGACY_DISPLAY") and "libLegacyStub.a" not in extra:
+        problems.append("CONFIG_XNU_EXTRA_LD_ARCHIVES must name build/legacy-stub/libLegacyStub.a "
+                        "when NATIVE_LEGACY_DISPLAY is off (bsd_init references the probes unconditionally)")
+
     board = tomllib.loads((device / "board.toml").read_text())
     archives = board.get("kernel", {}).get("archives", [])
-    extra = values.get("EXTRA_LD_ARCHIVES", "")
     producers = {
         "build/legacy-stub/libLegacyStub.a": "build-legacy-stub.py",
         "build/boot-progress/libBootProgress.a": "build-boot-progress.py",
