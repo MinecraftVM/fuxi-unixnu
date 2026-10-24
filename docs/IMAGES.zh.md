@@ -4,19 +4,19 @@
 
 ## 推荐顺序
 
-| # | 镜像 | 固件基线 | 大小 | 用途 |
-| --- | --- | --- | --- | --- |
-| 1 | `boot-uefi-hello-probe2.img` | 最新诊断 | 69 MB | 打印 initrd 范围与三个 anchor 的 hexdump，再按字节搜 `FUXIESP` |
-| 2 | `boot-uefi-hello-kdtb2.img` | 最新诊断 | 69 MB | payload 放 kernel 字段 DTB 之后，FDT 魔数扫描定位（完全绕开 ramdisk） |
-| 3 | `boot-uefi-hello-label64.img` | 最新诊断 | 69 MB | 只有字节级标签搜索的简洁版 |
-| 4 | `boot-uefi-diskdbg.img` | 旧基线 + 不 halt | 1.8 MB | 已知能进 UniXNU 界面（Restart / Power off） |
+| # | 镜像 | 大小 | 用途 |
+| --- | --- | --- | --- |
+| 1 | `boot-uefi-hello-gz3.img` | 1.9 MB | gzip ramdisk：验证 ABL 是否会解压（范围应变成 vendor+64 MiB） |
+| 2 | `boot-uefi-hello-lz4dec.img` | 2.1 MB | LZ4 legacy ramdisk + 固件解码器 + 5 个 anchor |
+| 3 | `boot-uefi-hello-dtbpay.img` | 69 MB | payload 内嵌在 FDT 的 totalsize 里，验证 ABL 是否整块复制 |
+| 4 | `boot-uefi-diskdbg.img` | 1.8 MB | 已知能进 UniXNU 界面（基线对照） |
 
 ## 校验值
 
 ```
-b35ef477d83219ee5bc2ad60d32107829cdf79292e79e97f7725cf6c72dd1d28  boot-uefi-hello-probe2.img
-1348ee06767fd09872043e9efd5511f9e7c8e5fc9404e5804a3501f1cbd83686  boot-uefi-hello-kdtb2.img
-375cd0a7614cd291215a1460d6802d733a66ff7aacb510091fafa5e44d4c67a2  boot-uefi-hello-label64.img
+c56d9fdd895d942c77d5dfa68e82c20864aa953626f6bfdfcecf7facb0e89b9e  boot-uefi-hello-gz3.img
+76dbc3cd06e218f9531999b902762b87873ee38d2d65765d865463712414d058  boot-uefi-hello-lz4dec.img
+73a30ef92fd41334a5737bbb72b04a3f4f11ba9f6a9ab26e5ee39da332e69ba1  boot-uefi-hello-dtbpay.img
 75f94150c7d24a3cbda8a50b92e24ebad9217091b0101b32b1a4ca76e56d0c6b  boot-uefi-diskdbg.img
 ```
 
@@ -25,7 +25,7 @@ b35ef477d83219ee5bc2ad60d32107829cdf79292e79e97f7725cf6c72dd1d28  boot-uefi-hell
 ```sh
 adb reboot bootloader
 fastboot devices
-fastboot boot boot-uefi-hello-probe2.img
+fastboot boot boot-uefi-hello-gz3.img
 ```
 
 - 只 boot，不 flash；长按电源 10 秒即可回到 Android；
