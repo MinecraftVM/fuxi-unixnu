@@ -54,6 +54,10 @@ on:
       extra_kernel_args:
         description: "extra XNU boot arguments, space separated (optional)"
         default: ""
+      pre_build:
+        description: "optional shell commands before the kernel build (bootstrap candidates, prelink fixtures)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -168,6 +172,15 @@ jobs:
         run: |
           cd unixnu
           ./unixnu ipsw fetch
+
+      - name: Run pre-build steps
+        if: inputs.mode == 'full' && inputs.pre_build != ''
+        env:
+          PRE_BUILD: ${{ inputs.pre_build }}
+          DEVICE_DIR: ${{ github.workspace }}/device
+        run: |
+          cd unixnu
+          bash -euo pipefail -c "$PRE_BUILD"
 
       - name: Build the kernel
         if: inputs.mode == 'full'
