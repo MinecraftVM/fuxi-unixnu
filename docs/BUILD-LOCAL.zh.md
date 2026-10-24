@@ -121,6 +121,20 @@ git -C uefi-fuxi checkout -- Platforms/Xiaomi/fuxiPkg   # 还原固件源码
 `--probe` 是幂等的：它把 `FuxiProbeDxe.inf` 加进 `fuxi.dsc` 的 `[Components]` 和
 `fuxi.fdf` 的 `FvMain`（放在控制台驱动之后），再跑一次不会重复添加。
 
+### 可选：屏幕日志固件（DEBUG 走 ConOut）
+
+```sh
+$PY fuxi-unixnu/scripts/apply-fixes.py --uefi uefi-fuxi --device unixnu-fuxi --debug-conout
+$PY ./unixnu build firmware --uefi ../uefi-fuxi
+$PY fuxi-unixnu/scripts/pack-bootimg-v3.py --uefi uefi-fuxi \
+  --fd uefi-fuxi/Build/fuxiPkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd \
+  --dtb uefi-fuxi/Resources/DTBs/fuxi.dtb --out out/boot-uefi-debugcon.img
+git -C uefi-fuxi checkout -- Platforms/Xiaomi/fuxiPkg
+```
+
+它只覆盖 DXE 阶段的 `DebugLib`（`[LibraryClasses.common.DXE_CORE]` 和 `.DXE_DRIVER`），
+SEC 保留串口库，否则 EDK II 会拒绝构建（`UefiDebugLibConOut` 不支持 SEC 模块类型）。
+
 ## 5. QEMU 冒烟测试（本机已跑通）
 
 不接手机也能验证「UniXNU.efi + FAT payload + 配置 + 菜单 + 启动 EFI 应用」这条链。

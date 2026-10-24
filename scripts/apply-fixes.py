@@ -186,6 +186,35 @@ def enable_probe(uefi: Path) -> None:
         print(f"{fdf}: probe added to FvMain")
 
 
+def enable_debug_conout(uefi: Path) -> None:
+    """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
+
+    The platform inherits BaseDebugLibSerialPort from SiliciumPkg; this board has
+    no accessible UART, so a screen log is the only way to see where the firmware
+    stops. The platform DSC comes after the included .inc files, so this mapping
+    wins.
+    """
+    dsc = uefi / "Platforms/Xiaomi/fuxiPkg/fuxi.dsc"
+    text, crlf = read_text(dsc)
+    if "UefiDebugLibConOut" in text:
+        print(f"{dsc}: ConOut debug already selected")
+        return
+    # The SEC module cannot consume the UEFI ConOut library, so the override is
+    # per module type: SEC keeps the serial port, DXE prints to the screen.
+    block = ("[LibraryClasses.common.DXE_CORE]\n"
+             "  DebugLib|MdePkg/Library/UefiDebugLibConOut/UefiDebugLibConOut.inf\n"
+             "\n"
+             "[LibraryClasses.common.DXE_DRIVER]\n"
+             "  DebugLib|MdePkg/Library/UefiDebugLibConOut/UefiDebugLibConOut.inf\n"
+             "\n")
+    anchor = "[LibraryClasses]\n"
+    if anchor not in text:
+        raise SystemExit(f"{dsc}: no [LibraryClasses] section")
+    text = text.replace(anchor, block + anchor, 1)
+    write_text(dsc, text, crlf)
+    print(f"{dsc}: DebugLib -> UefiDebugLibConOut")
+
+
 def check_settings(path: Path, text: str) -> None:
     """Report the two build-visible settings instead of silently trusting them."""
     if path.name.endswith(".toml") and "header_version" in text:
@@ -224,6 +253,8 @@ def main() -> int:
                         help="select the experimental console-only defconfig and archive list")
     parser.add_argument("--probe", action="store_true",
                         help="compile the FuxiProbeDxe bring-up diagnostic into the firmware volume")
+    parser.add_argument("--debug-conout", action="store_true",
+                        help="route EDK II DEBUG output to ConOut so the screen shows the boot log")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -254,6 +285,8 @@ def main() -> int:
 
     if args.probe:
         enable_probe(Path(args.uefi))
+    if args.debug_conout:
+        enable_debug_conout(Path(args.uefi))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)

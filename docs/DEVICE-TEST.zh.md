@@ -79,6 +79,30 @@ FAT 卷在内存里的位置；最后故意 `CpuDeadLoop()` 停住。
 它**不会继续启动**，看到结果后长按电源即可。复现方法见
 [BUILD-LOCAL.zh.md](BUILD-LOCAL.zh.md) 的“诊断固件”一节（`apply-fixes.py --probe`）。
 
+## 1d. 屏幕日志镜像（DEBUG 改走 ConOut）
+
+本地产物：`out/boot-uefi-debugcon.img`（1.84 MB）。
+
+默认固件的 DEBUG 走 `BaseDebugLibSerialPort`（串口），而小米 13 没有可接触的 UART，
+所以像
+
+```
+PrepareRfsProtection: Failed to Locate SCM Protocol! Status = Not Found
+```
+
+这类日志正常是看不到的。这一版把 **DXE 阶段的 DEBUG 改到 ConOut**，日志会打到屏幕上，
+能直接看出固件停在哪个模块。
+
+注意：
+
+- SEC 仍然用串口库（`UefiDebugLibConOut` 不能在 SEC 里用），所以最早的 SEC 日志还是看不到；
+- `PrepareRfsProtection` 那条本身**无害**：它在 `Silicon/Qualcomm/QcomPkg/Library/RfsProtectionLib/RfsProtection.c`
+  里 locate `gQcomScmProtocolGuid`，因为 `FUXI_VENDOR_HW=0` 没装 vendor 栈（SCM）而打印，然后
+  **返回 EFI_SUCCESS**，BdsDxe 继续。
+- 如果屏幕上一行日志都没有，说明 ConOut/GOP 还没起来，问题在显示路径而不是后面的模块。
+
+复现：`apply-fixes.py --debug-conout` 后重新编固件，见 [BUILD-LOCAL.zh.md](BUILD-LOCAL.zh.md)。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；
