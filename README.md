@@ -32,6 +32,8 @@
 | boot.img 结构（v3、BootShim、gzip、DTB、ramdisk） | ✅ 实测 | `boot.json` 逐段回读 |
 | QEMU/AAVMF 上跑 UniXNU 菜单并启动 EFI payload | ✅ 实测 | `docs/BUILD-LOCAL.zh.md` 第 5 节 + 截图 |
 | 真实的 192 MiB payload FAT 镜像能被发现/启动 | ✅ 实测 | `scripts/qemu-smoke.sh --payload-image` |
+| UniXNU 界面在小米 13 上显示 | ✅ 真机反馈（2026-10-24） | "能进unixnu界面" |
+| payload 的 ADT 生成与结构 | ✅ 实测 | 13496 字节，节点与 chip-id/unique-chip-id 已核对 |
 | fuxi 真机固件 | ⏳ 待你测 | `boot-uefi-only.img` |
 | macOS 上编 XNU 内核 | ⏳ 待 Actions | workflow `mode=full` |
 

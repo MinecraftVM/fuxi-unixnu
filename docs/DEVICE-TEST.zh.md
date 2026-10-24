@@ -191,6 +191,24 @@ FUXIRAMDISK: payload at 0x... (找到时)
 - 菜单里出现 **fuxi: UEFI hello (no XNU)** → 卷找到了，FAT/config/加载整条链在真机上通了；
 - 菜单里只有内置项（没有 hello）→ 卷没找到，把屏幕上的 `FUXIRAMDISK:` 行发回来。
 
+## 1g. 一张图看全：`boot-uefi-diag.img`
+
+带 hello payload，同时打开三组诊断（都用 `DEBUG`，屏幕可见）：
+
+| 前缀 | 内容 |
+| --- | --- |
+| `FUXIRAMDISK:` | 驱动入口、HOB 提示、扫描结果、是否返回 |
+| `FUXIDT:` | x0 的值、是否是合法 FDT、`/chosen` 的 `linux,initrd-start/end`、bootargs |
+| `FUXIMAP:` | 内存描述符（≥16 MiB，最多 12 条）：基址、大小、类型 |
+
+这三个组合起来能回答：
+- ABL 有没有把 ramdisk 地址写进 `/chosen`（有的话直接用，不用扫）；
+- 大块 RAM 都在哪（ramdisk 只可能落在这些区域）；
+- 当前扫描窗口为什么没命中。
+
+如果 `initrd-start/end` 指向一段 192 MiB 左右的范围，那就是我们的 payload，
+下一版固件直接用它，不再扫描。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；
