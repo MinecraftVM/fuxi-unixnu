@@ -186,6 +186,8 @@ def main():
                         help="gzip the ramdisk first; some bootloaders only decompress a compressed ramdisk")
     parser.add_argument("--lz4-ramdisk", action="store_true",
                         help="compress the ramdisk with legacy lz4 (lz4 -l) before packing")
+    parser.add_argument("--dtb-payload", action="store_true",
+                        help="append the payload inside the FDT blob (inflating totalsize)")
     parser.add_argument("--raw-kernel", action="store_true",
                         help="do not gzip the kernel field; the bootloader jumps straight into BootShim")
     parser.add_argument("--payload-after-dtb", action="store_true",
@@ -212,6 +214,14 @@ def main():
     if dtb[:4] != FDT_MAGIC or struct.unpack_from(">I", dtb, 4)[0] != len(dtb):
         raise PackError(f"{args.dtb} is not a complete flattened device tree")
     ramdisk = Path(args.ramdisk).read_bytes() if args.ramdisk else b""
+    if args.dtb_payload and ramdisk:
+        blob = bytearray(dtb)
+        blob[4:8] = struct.pack(">I", len(blob) + len(ramdisk))
+        blob += ramdisk
+        dtb = bytes(blob)
+        ramdisk = b""
+        args.payload_after_dtb = True
+        print(f"dtb payload: FDT blob is now {len(dtb)} bytes")
     ramdisk_kind = describe_ramdisk(ramdisk)
     if ramdisk and args.gzip_ramdisk:
         raw_size = len(ramdisk)
@@ -266,6 +276,7 @@ def main():
         "ramdisk_lz4": bool(args.lz4_ramdisk),
         "payload_after_dtb": bool(args.payload_after_dtb),
         "raw_kernel": bool(args.raw_kernel),
+        "dtb_payload": bool(args.dtb_payload),
         "config": args.config, "packer": pack_output,
     })
     Path(args.out).with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")

@@ -596,6 +596,24 @@ def enable_ramdisk_full(uefi: Path) -> None:
               if (mVolumeBase == NULL) {
                 UINT32  DtSize = Fdt32ToCpu (*(CONST UINT32 *)((UINT8 *)(UINTN)Dt + 4));
                 UINT64  After  = (UINT64)(UINTN)Dt + DtSize;
+
+                {
+                  UINT64  Scan;
+                  UINT64  Total = 0;
+                  UINT8   *Blob = (UINT8 *)(UINTN)Dt;
+                  DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: dtb payload scan %lx bytes\n", (UINT64)DtSize));
+                  for (Scan = 0x47; (Scan + 8) <= (UINT64)DtSize; Scan++) {
+                    if ((Blob[Scan] == 'F') && (CompareMem (Blob + Scan, "FUXIESP", 8) == 0)) {
+                      UINT64  Candidate = Scan - 0x47;
+                      if (IsPayloadVolume (Blob + Candidate, &Total)) {
+                        mVolumeBase  = Blob + Candidate;
+                        mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                        DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx inside the dtb\n", (UINT64)(UINTN)(Blob + Candidate)));
+                        break;
+                      }
+                    }
+                  }
+                }
                 UINT64  Probe;
                 UINT64  Total = 0;
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: device tree %lx..%lx\n", (UINT64)(UINTN)Dt, After));
