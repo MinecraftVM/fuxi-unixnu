@@ -509,10 +509,18 @@ def enable_ramdisk_full(uefi: Path) -> None:
               UINT64  Start = (Len >= 8) ? Fdt64ToCpu (*(CONST UINT64 *)Prop) : (UINT64)Fdt32ToCpu (*(CONST UINT32 *)Prop);
               UINT64  Total = 0;
               DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: chosen initrd-start=%lx\n", Start));
-              if (IsPayloadVolume ((UINT8 *)(UINTN)Start, &Total)) {
-                mVolumeBase  = (UINT8 *)(UINTN)Start;
-                mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
-                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at chosen initrd %lx\n", Start));
+              {
+                UINT64  Probe;
+                UINT64  From = (Start > 0x400000ULL) ? (Start - 0x400000ULL) : 0;
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: chosen window scan +-4 MiB\n"));
+                for (Probe = From; Probe < Start + 0x400000ULL; Probe += FUXI_BLOCK_SIZE) {
+                  if (IsPayloadVolume ((UINT8 *)(UINTN)Probe, &Total)) {
+                    mVolumeBase  = (UINT8 *)(UINTN)Probe;
+                    mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx near chosen initrd\n", Probe));
+                    break;
+                  }
+                }
               }
             }
           }

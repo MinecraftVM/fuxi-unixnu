@@ -243,6 +243,45 @@ FUXIRAMDISK: payload at 0x... from the memory map
 
 菜单里出现 **fuxi: UEFI hello (no XNU)** 就是找到了。哪怕没找到，`initrd-start` 的值也直接告诉我们 ABL 的想法。
 
+## 1j. 真机日志读出来的内存布局（2026-10-24）
+
+用 `boot-uefi-diag.img` 抓到（屏幕 OCR，数值以设备为准）：
+
+```
+FUXIDT: entry x0=0x…7A085000
+FUXIDT: fdt ok, chosen=…
+FUXIDT: initrd-start=0x…, initrd-end=0xB7FFE…, len=8
+FUXIMAP: 55 descriptors
+FUXIMAP: A8000000 256 MiB type 0   ← 平台的 "Kernel" 窗口
+FUXIMAP: BAB00000 186 MiB type 7   ← DXE heap（Conventional）
+FUXIMAP: 89800000 402 MiB type 0
+FUXIMAP: A2AB0000  54 MiB type 0
+FUXIMAP: D8800000 138 MiB type 0
+FUXIRAMDISK: no volume; hob=1 base=0x…C4C2914
+FUXIRAMDISK: returning NOT_FOUND instead of halting
+```
+
+两条结论：
+
+1. **SEC 的提示地址在低内存**（`base`≈0x0C4C2914，对应 x1+3 MiB），而 192 MiB 的 payload
+   只可能落在 `0xA8000000` 那个 256 MiB 的 Kernel 窗口里——所以向下/向上 16 MiB 都扫不到；
+2. 设备树里 **`/chosen` 有 `linux,initrd-start/end`**（len=8，64 位），ABL 按 Linux 惯例
+   把 ramdisk 地址写进去了——这是最可靠的线索。
+
+因此 `boot-uefi-hello-full.img` 的策略是：
+
+- 先认 `/chosen` `initrd-start`，并且在它 **±4 MiB** 范围内按 512 B 步长找 FAT BPB；
+- 第二个候选是 Kernel 窗口 `0xA8000000..0xB8000000` 整段扫描；
+- 最后才是常规内存描述符扫描。
+
+预期日志：
+
+```
+FUXIRAMDISK: chosen initrd-start=0x...
+FUXIRAMDISK: chosen window scan +-4 MiB
+FUXIRAMDISK: payload at 0x... near chosen initrd     ← 命中
+```
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；
