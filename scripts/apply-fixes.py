@@ -736,13 +736,13 @@ def enable_ramdisk_full(uefi: Path) -> None:
           EFI_MEMORY_DESCRIPTOR  *Desc = (EFI_MEMORY_DESCRIPTOR *)((UINT8 *)Map + Index * DescSize);
           UINT64                 RegionStart = Desc->PhysicalStart;
           UINT64                 RegionEnd   = RegionStart + (Desc->NumberOfPages << 12);
-          if (RegionStart < 0x80000000ULL) {
+          if (RegionStart < 0x1000ULL) {
             continue;
           }
           if (RegionStart >= 0xD0000000ULL) {
             continue;
           }
-          if (Desc->NumberOfPages < ((64ULL * 1024 * 1024) >> 12)) {
+          if (Desc->NumberOfPages < ((4ULL * 1024 * 1024) >> 12)) {
             continue;
           }
           if (Scanned >= 0x80000000ULL) {
