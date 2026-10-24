@@ -134,3 +134,19 @@ fastboot boot out/flash-kit/boot-uefi-hello-gz3.img
 - **回滚**：`fastboot flash vendor_boot 官方镜像`。
 
 工具在合成 v4 镜像上验证过：头部字段、页对齐、ramdisk 追加、dtb/bootconfig 重排都正确。
+### 4.4 当前阻塞：AMFI 需要 PMGR（2026-10-24）
+
+真机日志：
+
+```
+"AMFI: No PMGR?%\n" @ConfigurationSettings.cpp:235
+TCR=0x000000022a51a251a SCTLR=0x000000003454593d
+pages=0x3d7c free=0x3401
+```
+
+- XNU 已执行到 AMFI（原始 kext）；
+- `amfi_get_out_of_my_way=1` 不覆盖该检查；
+- sheng 的 PMGR 归档（`build-sheng-platform-power.py`）需要私有 prelink 候选，
+  公开仓库（fuxi/sheng/uefi-sheng/vermeer/fork）都没有 nub 实现。
+
+**恢复**：`fastboot flash vendor_boot_b out/vendor_boot_b.img`。
