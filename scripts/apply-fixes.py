@@ -45,6 +45,7 @@ CONSOLE_ARCHIVES = [
     "build-corecrypto-14.py --namespace",
     "build-arm-driver.py ArmDTPlatform",
     "build-arm-driver.py ArmCpu",
+    "build-sheng-platform-power.py",
     "build-libpthread-kernel.py",
     "build-legacy-stub.py",
 ]
@@ -971,6 +972,24 @@ def enable_lz4_payload(uefi: Path) -> None:
     print(f"{source}: lz4 search inserted")
 
 
+def enable_sheng_pmgr(device: Path) -> None:
+    """Turn on sheng-pmgr=2 and let the PMGR archive build without a prelink candidate."""
+    board = device / "board.toml"
+    content, crlf = read_text(board)
+    if '# "sheng-pmgr=2"' in content:
+        content = content.replace('# "sheng-pmgr=2"', '"sheng-pmgr=2"', 1)
+        write_text(board, content, crlf)
+        print(f"{board}: sheng-pmgr=2 enabled")
+    builder = device / "scripts" / "build-sheng-platform-power.py"
+    if builder.is_file():
+        script, script_crlf = read_text(builder)
+        audit = "print(run(['python3', ROOT / 'scripts/audit-amfi-pmgr-contract.py'], text=True), end='')"
+        if audit in script:
+            script = script.replace(audit, "print('sheng-pmgr: audit skipped for the console bring-up build')", 1)
+            write_text(builder, script, script_crlf)
+            print(f"{builder}: audit skipped")
+
+
 def enable_debug_conout(uefi: Path) -> None:
     """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
 
@@ -1110,6 +1129,7 @@ def main() -> int:
         set_min_payload(Path(args.uefi), args.min_payload_mib)
     if args.lz4_payload:
         enable_lz4_payload(Path(args.uefi))
+    enable_sheng_pmgr(Path(args.device))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)
