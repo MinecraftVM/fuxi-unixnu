@@ -471,3 +471,5 @@ pack-bootimg-v3.py ... --ramdisk payload-hello-64.img --payload-after-dtb --out 
 ```
 
 镜像：`out/boot-uefi-hello-kdtb.img`（69 MB，kernel 字段 68.9 MB，ramdisk 为空）。
+驱动会先打印 `device tree <start>..<end>`，然后检查 DTB 末尾是否紧跟 FAT 卷
+（`payload at ... after the device tree`）。

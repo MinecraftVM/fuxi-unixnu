@@ -560,6 +560,26 @@ def enable_ramdisk_full(uefi: Path) -> None:
                 }
               }
               if (mVolumeBase == NULL) {
+                UINT32  DtSize = Fdt32ToCpu (*(CONST UINT32 *)((UINT8 *)(UINTN)Dt + 4));
+                UINT64  After  = (UINT64)(UINTN)Dt + DtSize;
+                UINT64  Probe;
+                UINT64  Total = 0;
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: device tree %lx..%lx\n", (UINT64)(UINTN)Dt, After));
+                if (IsPayloadVolume ((UINT8 *)(UINTN)After, &Total)) {
+                  mVolumeBase  = (UINT8 *)(UINTN)After;
+                  mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                  DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx after the device tree\n", After));
+                }
+                for (Probe = After + FUXI_BLOCK_SIZE; (mVolumeBase == NULL) && (Probe < After + 0x400000ULL); Probe += FUXI_BLOCK_SIZE) {
+                  if (IsPayloadVolume ((UINT8 *)(UINTN)Probe, &Total)) {
+                    mVolumeBase  = (UINT8 *)(UINTN)Probe;
+                    mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx right after the device tree\n", Probe));
+                    break;
+                  }
+                }
+              }
+              if (mVolumeBase == NULL) {
                 UINT64  Probe;
                 UINT64  From = (Start > 0x400000ULL) ? (Start - 0x400000ULL) : 0;
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: chosen window scan +-4 MiB\n"));
