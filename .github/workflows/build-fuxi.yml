@@ -155,6 +155,7 @@ jobs:
           if [ -z "$defconfig" ]; then
             if [ "$CONFIG_MODE" = console ]; then defconfig=fuxi_console_defconfig; else defconfig=fuxi_defconfig; fi
           fi
+          python3 self/scripts/check-defconfig.py --device device --config "device/configs/$defconfig"
           cd unixnu
           ./unixnu defconfig "$defconfig"
           ./unixnu status
