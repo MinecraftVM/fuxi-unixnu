@@ -145,7 +145,7 @@ jobs:
             args+=(--fd-base "$FD_BASE" --fd-size "$FD_SIZE")
           fi
           if [ "$CONFIG_MODE" = console ]; then args+=(--console); fi
-          python3 self/scripts/apply-fixes.py --uefi uefi --device device "${args[@]}" --discover
+          python3 self/scripts/apply-fixes.py --uefi uefi --device device "${args[@]}" --discover --discover
 
       - name: Check the IPSW kernelcache pin
         run: |
@@ -159,6 +159,7 @@ jobs:
           if [ -z "$defconfig" ]; then
             if [ "$CONFIG_MODE" = console ]; then defconfig=fuxi_console_defconfig; else defconfig=fuxi_defconfig; fi
           fi
+          python3 self/scripts/check-firmware.py --uefi uefi --device device
           python3 self/scripts/check-defconfig.py --device device --config "device/configs/$defconfig"
           cd unixnu
           ./unixnu defconfig "$defconfig"
