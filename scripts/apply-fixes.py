@@ -518,7 +518,6 @@ def enable_ramdisk_full(uefi: Path) -> None:
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: chosen initrd %lx..%lx size=%lx\n", Start, End, (End > Start) ? (End - Start) : 0));
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: [%lx] %08x %08x %08x %08x\n", Start, Words[0], Words[1], Words[2], Words[3]));
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: [%lx] %08x %08x %08x %08x\n", Start + 16, Words[4], Words[5], Words[6], Words[7]));
-              }
               if ((mVolumeBase == NULL) && (End > Start) && ((End - Start) < 0x20000000ULL)) {
                 UINT64  Offset;
                 UINT64  Total = 0;
@@ -536,6 +535,7 @@ def enable_ramdisk_full(uefi: Path) -> None:
                     }
                   }
                 }
+              }
               }
               {
                 EFI_STATUS             MapStatus;
