@@ -33,6 +33,27 @@ fastboot boot boot-uefi-only.img
 
 **不要**在这一步用 `fastboot flash`。
 
+## 1b. 测试 A2：UEFI + hello payload（不需要内核）
+
+本地产物：`out/boot-uefi-hello.img`（68.9 MB，ramdisk 64 MiB）。
+里面是一个 FAT 卷：
+
+```
+EFI/UniXNU/unixnu.toml         菜单配置（hello / Restart / Power off）
+EFI/UniXNU/Payloads/HelloPayload.efi
+```
+
+它比 A 多验证四件事：ramdisk 被 `FuxiRamDiskDxe` 发布成 BlockIo → FAT 驱动挂载 →
+UniXNU 读到 `unixnu.toml` → 真的启动一个 EFI 应用。
+
+预期：菜单出现 **fuxi: UEFI hello (no XNU)**，选中后 `HelloPayload` 打印信息或返回菜单。
+如果 A 有菜单而 A2 没有 hello 项，问题就在 ramdisk/FAT/config，而不在内核——
+这个区分能省掉大量猜测。
+
+```sh
+fastboot boot boot-uefi-hello.img
+```
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；
