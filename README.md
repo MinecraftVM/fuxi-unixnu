@@ -62,8 +62,10 @@
    | chip_id | `full` 必填，16 位十六进制：`openssl rand -hex 8` |
    | 其他 | 保持默认（上游按 commit 固定） |
 
-3. 跑完在 Artifacts 下载 `fuxi-*-boot-*`，里面有 `boot.img`、`boot.json` 和日志。
-4. 手机（已解锁 BL）：
+3. 工作流会先跑一个 **Ubuntu 预检**（配置修正 + IPSW kernelcache pin 校验 + defconfig 选择），
+   预检失败不会消耗 macOS runner 的分钟；通过后才进入 macOS 构建。
+4. 跑完在 Artifacts 下载 `fuxi-*-boot-*`，里面有 `boot.img`、`boot.json` 和日志。
+5. 手机（已解锁 BL）：
 
    ```sh
    adb reboot bootloader
@@ -116,7 +118,7 @@ board.toml 会给 boot 镜像的 DTB 追加：
 ## 目录
 
 ```
-.github/workflows/build-fuxi.yml   一键 macOS 构建
+.github/workflows/build-fuxi.yml   Ubuntu 预检 + macOS 一键构建
 scripts/apply-fixes.py             配置修复（幂等；默认只删重复 splash 节点）
 scripts/pack-bootimg-v3.py         BootShim + 固件 + DTB + payload → boot.img（v3，含校验）
 docs/DEPLOY.zh.md                  部署、验证、排障、回滚

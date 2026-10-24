@@ -43,6 +43,7 @@ FUXIRAMDISK: no volume; hob=1 base=0x…C4C2914   ← SEC 提示在低内存，�
 | DriverKit 头恢复 | ✅ Linux 实测 | 26 个头，blob 哈希校验 |
 | IPSW 身份 + kernelcache pin | ✅ Linux 实测 | `f18b4df…` 与 board.toml 一致 |
 | **XNU 编译/链接** | ⏳ **只剩 macOS** | workflow `mode=full, config=console` |
+| CI 预检（配置 + IPSW pin） | ✅ 本机按 CI 路径实测 | 预检失败不消耗 macOS 分钟 |
 | trust cache bundle | ⏳ 需要设备输入 | `static-trustcache.bin` |
 
 ## 4. 镜像清单

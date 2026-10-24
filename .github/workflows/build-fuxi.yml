@@ -91,7 +91,76 @@ defaults:
     shell: bash
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+        with:
+          path: self
+          persist-credentials: false
+
+      - name: Check out UniXNU
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.unixnu_repo }}
+          ref: ${{ inputs.unixnu_ref }}
+          path: unixnu
+          persist-credentials: false
+
+      - name: Check out the device repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.device_repo }}
+          ref: ${{ inputs.device_ref }}
+          path: device
+          persist-credentials: false
+
+      - name: Check out the Mu-Silicium firmware
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.uefi_repo }}
+          ref: ${{ inputs.uefi_ref }}
+          path: uefi
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc mtools device-tree-compiler
+
+      - name: Apply the fuxi build fixes
+        run: |
+          args=()
+          if [ "$FD_BASE" != "" ] && [ "$FD_SIZE" != "" ]; then
+            args+=(--fd-base "$FD_BASE" --fd-size "$FD_SIZE")
+          fi
+          if [ "$CONFIG_MODE" = console ]; then args+=(--console); fi
+          python3 self/scripts/apply-fixes.py --uefi uefi --device device "${args[@]}"
+
+      - name: Check the IPSW kernelcache pin
+        run: |
+          git clone -q --depth 1 https://github.com/lzfse/lzfse
+          gcc -O2 -o lzfse_dec lzfse/src/*.c
+          python3 self/scripts/verify-ipsw.py --unixnu unixnu --device device --lzfse ./lzfse_dec
+
+      - name: Select the device
+        run: |
+          defconfig="$DEFCONFIG_INPUT"
+          if [ -z "$defconfig" ]; then
+            if [ "$CONFIG_MODE" = console ]; then defconfig=fuxi_console_defconfig; else defconfig=fuxi_defconfig; fi
+          fi
+          cd unixnu
+          ./unixnu defconfig "$defconfig"
+          ./unixnu status
+
   build:
+    needs: preflight
     runs-on: macos-26
     timeout-minutes: 350
     steps:
