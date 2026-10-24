@@ -10,7 +10,7 @@
  
  extern "C" {
  #include <libkern/amfi/amfi.h>
-@@ -110,6 +113,31 @@
+@@ -110,6 +113,33 @@
  kern_return_t
  IOKitBSDInit( void )
  {
@@ -32,10 +32,12 @@
 +			}
 +			IOService *sheng_pmgr_platform = IOService::getPlatform();
 +			bool sheng_pmgr_attached = (sheng_pmgr_platform != nullptr) && nub->attach(sheng_pmgr_platform);
-+			bool sheng_pmgr_reg = sheng_pmgr_attached && nub->registerService();
-+			bool sheng_pmgr_started = sheng_pmgr_reg && nub->start(sheng_pmgr_platform);
++			if (sheng_pmgr_attached) {
++				nub->registerService();
++			}
++			bool sheng_pmgr_started = sheng_pmgr_attached && nub->start(sheng_pmgr_platform);
 +			if (!sheng_pmgr_started) {
-+				panic("SHENG-PMGR-STUB: late, start failed (attached=%d reg=%d)", sheng_pmgr_attached, sheng_pmgr_reg);
++				panic("SHENG-PMGR-STUB: late, start failed (attached=%d)", sheng_pmgr_attached);
 +			}
 +		}
 +	}
