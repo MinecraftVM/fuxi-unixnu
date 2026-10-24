@@ -59,11 +59,15 @@ xcode  = 留空
 - 因此 `--discover` 在 `[initrd-start, initrd-end)` 内**按字节**搜 `FUXIESP` 标签，
   回推 0x47 校验 BPB；模拟缓冲验证命中 `B3FFFBB9`。
 
-测试镜像（按顺序）：
+测试镜像与判读：
 
-1. `out/boot-uefi-hello-probe2.img` —— 打印 initrd 范围与三个 anchor 的 hexdump，再按字节搜标签；
-2. `out/boot-uefi-hello-kdtb2.img` —— payload 放 kernel 字段 DTB 之后，FDT 魔数扫描定位；
-3. `out/boot-uefi-hello-label64.img` —— 只有标签扫描的简洁版。
+| 镜像 | 关键输出 | 含义 |
+| --- | --- | --- |
+| `hello-lz4dec`（2.1 MB） | `lz4 at +...` → `payload at ... (lz4 decompressed)` | ABL 拷贝压缩帧，固件解码成功 |
+| 同上 | `no lz4 frame in the initrd range` | 范围内没有压缩帧 |
+| `hello-kdtb2` | `fdt at ...` → `payload at ... after the fdt` | kernel 字段尾部被保留 |
+| `hello-rawk` | 同上（kernel 不 gzip） | gzip 解压释放原缓冲时的备选 |
+| `hello-probe2` | 三个 anchor 的 hexdump | 卷在范围内与否的原始证据 |
 
 如果三条都不行，剩余通道是：**USB mass storage**（FV 里有 UsbBus/UsbMassStorage）或
 **分区**（FV 里有 PartitionDxe/FatDxe）；两者都要求 ABL 之后固件能枚举到相应块设备，
