@@ -506,3 +506,21 @@ pack-bootimg-v3.py ... --ramdisk payload-hello-64.img --payload-after-dtb --out 
 镜像：`out/boot-uefi-hello-kdtb.img`（69 MB，kernel 字段 68.9 MB，ramdisk 为空）。
 驱动会先打印 `device tree <start>..<end>`，然后检查 DTB 末尾是否紧跟 FAT 卷
 （`payload at ... after the device tree`）。
+## 1n. probe v2 真机日志（2026-10-24）
+
+```
+FUXIRAMDISK: probe v2, label scan B22B6000..B7FFEBB9 (5D48BB9 bytes)
+FUXIRAMDISK: anchor +0: 184C2102 00280F50 303730E0 30313037
+FUXIRAMDISK: anchor +1D48BB9: FCC08ED8 BE0100B9 00BF7C00 EAA5F380
+```
+
+- 范围长度 `0x5D48BB9 = 0x1D48BB9 + 0x4000000`，正好是 vendor ramdisk + 64 MiB；
+- `anchor +0` 是 `184C2102`（LZ4）：vendor ramdisk 在起点；
+- `anchor +1D48BB9`（vendor 之后、按大小推算的卷位置）是 `FCC08ED8…` 一类**随机数据**，
+  不是 FAT 的 `EB 3C 90 …`。
+
+结论：ABL **为 boot image ramdisk 预留了 64 MiB 并把这段算进了 initrd 范围**，但没有把
+原始 FAT 拷进去（内容像未初始化的 DRAM）。最可能的原因是它期待**压缩过的 ramdisk**，
+解压失败后跳过了拷贝。
+
+下一步：`boot-uefi-hello-gz2.img`（ramdisk = gzip(64 MiB FAT)，压缩后 77 KB）。
