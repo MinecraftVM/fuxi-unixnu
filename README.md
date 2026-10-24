@@ -134,7 +134,7 @@ scripts/qemu-smoke.sh              QEMU/AAVMF 冒烟测试（已验证 UniXNU + 
 | --- | --- |
 | UniXNU/UniXNU | `1a01c2afa197d975d04da892325c56b6b14aaecb` |
 | hanzi123-bilp/unixnu-fuxi | `d12c0585c7c82941c17e4af6bace12dc46953c85` |
-| hanzi123-bilp/uefi-fuxi | `37b367b75a7827c96d977f843aa7443fe023e066` |
+| hanzi123-bilp/uefi-fuxi | `c15fe3523477445dafeb62c557fb9758d80d1c52` |
 
 上游还在高频推进；要跟新版在 Run workflow 里改 `*_ref` 即可（可能会和补丁冲突，日志里能看到）。
 

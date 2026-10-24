@@ -209,6 +209,19 @@ FUXIRAMDISK: payload at 0x... (找到时)
 如果 `initrd-start/end` 指向一段 192 MiB 左右的范围，那就是我们的 payload，
 下一版固件直接用它，不再扫描。
 
+## 1h. 跟随上游最新：`boot-uefi-hello-new.img`
+
+上游在 2026-10-24 又推了几个提交（`5f5727c1`…`c15fe352`）：
+
+- `6dc976ee` 让 `FuxiRamDiskDxe` **只报告、不清屏、不死循环**；
+- `628e5aa3` / `c15fe352` 把它重新编进固件卷。
+
+也就是说我们之前手动打的"不 halt"补丁，上游已经合入。`out/boot-uefi-hello-new.img` 就是基于这个新基线
+（外加我们的 DEBUG 输出和向上扫描）编译的，带 192 MiB hello payload。
+
+如果它和 `boot-uefi-hello-up.img` 表现一致，可以确认不是基线差异；如果只有它能进 hello 项，
+说明上游顺手修了别的东西。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；

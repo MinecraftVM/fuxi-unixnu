@@ -242,6 +242,10 @@ def enable_probe(uefi: Path) -> None:
     ]
     for needle, replacement in replacements:
         if needle not in text:
+            if needle == "    CpuDeadLoop ();":
+                # Upstream commit 6dc976ee already returns instead of halting.
+                print(f"{source}: dead loop already gone (newer upstream)")
+                continue
             raise SystemExit(f"{source}: anchor not found: {needle!r}")
         text = text.replace(needle, replacement, 1)
     write_text(source, text, crlf)
@@ -285,10 +289,14 @@ def enable_ramdisk_debug(uefi: Path) -> None:
     ]
     for needle, replacement in replacements:
         if needle not in text:
+            if needle == "    CpuDeadLoop ();":
+                # Upstream commit 6dc976ee already returns instead of halting.
+                print(f"{source}: dead loop already gone (newer upstream)")
+                continue
             raise SystemExit(f"{source}: anchor not found: {needle!r}")
         text = text.replace(needle, replacement, 1)
     write_text(source, text, crlf)
-    print(f"{source}: DEBUG lines added, dead loop removed")
+    print(f"{source}: DEBUG lines added")
 
     inf_text, inf_crlf = read_text(inf)
     if "DebugLib" not in inf_text:
