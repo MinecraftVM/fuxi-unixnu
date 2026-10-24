@@ -140,6 +140,37 @@ UNIXNU: ...
 `payload at 0x...` 表示卷找到了；`no volume` 表示 SEC 的 HOB 提示没有命中，
 接下来就要看 `base=` 的值和 BootShim 传参。
 
+### 为什么 hint 可能指错地方
+
+固件里 SEC 写死了提示地址（`Silicon/Silicium/SiliciumPkg/Sec/Sec.c`）：
+
+```c
+PayloadBase = gSecEntryArg1 + 0x300000;   // the payload sits just below the device tree
+```
+
+`gSecEntryArg1` 是 BootShim 传进来的 x1，也就是 `_Payload`（固件卷拷贝源）的地址；
+`+0x300000` 正好是 3 MiB 固件卷的末尾。上游的查找逻辑从这点**向下**扫 256 MiB。
+
+但 boot 镜像的 kernel 字段是 `gzip(shim+FD) + DTB`，ramdisk 是独立字段。如果 ABL 把 ramdisk
+放在 DTB 之后（更高地址），向下扫永远扫不到——这正好能解释“no volume”。
+
+`out/boot-uefi-diskup.img` 把扫描方向改成**向上 16 MiB**，并用 DEBUG 打印起点：
+
+```
+FUXIRAMDISK: scanning up from 0x...
+FUXIRAMDISK: payload at 0x... (找到时)
+```
+
+两个镜像的用途：
+
+| 镜像 | 扫描方向 | 用途 |
+| --- | --- | --- |
+| `boot-uefi-diskdbg.img` | 上游（向下 256 MiB） | 先看 `hob=`/`base=`，确认提示值 |
+| `boot-uefi-diskup.img` | 向上 16 MiB | 提示值偏低时用 |
+
+如果 `hob=0`，说明 SEC 根本没发布提示（x0 指向的 FDT 没通过 magic/大小检查），
+那就不是扫描方向的问题，要先修 SEC 的取值。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；

@@ -301,6 +301,33 @@ def enable_ramdisk_debug(uefi: Path) -> None:
         print(f"{inf}: DebugLib already present")
 
 
+def enable_ramdisk_scan(uefi: Path) -> None:
+    """Scan upward from the SEC payload hint instead of downward.
+
+    SEC computes the hint as gSecEntryArg1 + 0x300000, i.e. right after the 3 MiB
+    firmware volume. The boot image appends the device tree to the kernel field, so
+    the ramdisk the ABL loads lies *above* that point, not below it: the upstream
+    loop walks 256 MiB downwards and never reaches it. This patch scans 16 MiB
+    upwards from the hint and reports through DEBUG, which reaches the panel even
+    when ConOut (GOP) does not.
+    """
+    source = uefi / "Platforms/Xiaomi/fuxiPkg/Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.c"
+    text, crlf = read_text(source)
+    if "scanning up from" in text:
+        print(f"{source}: upward scan already applied")
+        return
+    if "#include <Library/DebugLib.h>" not in text:
+        text = text.replace("#include <Uefi.h>\n", "#include <Uefi.h>\n#include <Library/DebugLib.h>\n", 1)
+    old_loop = "        for (Probe = Base; (Probe > Base - 0x10000000ULL) && (Probe >= FUXI_BLOCK_SIZE); Probe -= FUXI_BLOCK_SIZE) {"
+    new_loop = ('        DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: scanning up from %lx, 16 MiB\\n", Base));\n'
+                "        for (Probe = Base; Probe < Base + 0x01000000ULL; Probe += FUXI_BLOCK_SIZE) {")
+    if old_loop not in text:
+        raise SystemExit(f"{source}: hint loop anchor not found")
+    text = text.replace(old_loop, new_loop, 1)
+    write_text(source, text, crlf)
+    print(f"{source}: hint scan now walks upwards")
+
+
 def enable_debug_conout(uefi: Path) -> None:
     """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
 
@@ -372,6 +399,8 @@ def main() -> int:
                         help="route EDK II DEBUG output to ConOut so the screen shows the boot log")
     parser.add_argument("--ramdisk-debug", action="store_true",
                         help="make FuxiRamDiskDxe log through DEBUG and stop it halting the boot")
+    parser.add_argument("--ramdisk-scan", action="store_true",
+                        help="scan upwards from the SEC payload hint (the ramdisk sits above the appened tree)")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -406,6 +435,8 @@ def main() -> int:
         enable_debug_conout(Path(args.uefi))
     if args.ramdisk_debug:
         enable_ramdisk_debug(Path(args.uefi))
+    if args.ramdisk_scan:
+        enable_ramdisk_scan(Path(args.uefi))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)
