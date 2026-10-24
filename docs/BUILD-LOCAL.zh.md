@@ -105,7 +105,54 @@ $PY fuxi-unixnu/scripts/pack-bootimg-v3.py \
 脚本会编译 BootShim、校验 ARM64 header、gzip、调用上游
 `uefi-fuxi/tools/mkbootimg_v3.py` 打包，再逐段回读校验。
 
-## 5. 实测记录（2026-10-24）
+## 5. QEMU 冒烟测试（本机已跑通）
+
+不接手机也能验证「UniXNU.efi + FAT payload + 配置 + 菜单 + 启动 EFI 应用」这条链。
+QEMU 上用 AAVMF（EDK II 的 AArch64 固件）启动，ESP 通过 vvfat 只读挂载。
+
+```sh
+$PY fuxi-unixnu/scripts/qemu-smoke.sh \
+  --unixnu UniXNU \
+  --efi UniXNU/out/fuxi/package/Build/Out/AARCH64-DEBUG/UniXNU.efi \
+  --hello UniXNU/out/fuxi/package/Build/Out/AARCH64-DEBUG/HelloPayload.efi \
+  --firmware /usr/share/AAVMF/AAVMF_CODE.fd \
+  --vars /usr/share/AAVMF/AAVMF_VARS.fd \
+  --log out/qemu-hello.log --png out/qemu-hello.png
+```
+
+没有 root 时，QEMU 和 AAVMF 也能从 deb 解包运行（本机就是这么做的）：
+
+```sh
+apt-get download qemu-system-arm qemu-efi-aarch64 device-tree-compiler \
+  libfdt1 libpmem1 librdmacm1 libibverbs1 libslirp0 liburing2 libaio1 libndctl6 libdaxctl1
+for d in *.deb; do dpkg-deb -x "$d" qemu; done
+Q=$PWD/qemu
+LIBPATH=$(find $Q -name '*.so*' -printf '%h\n' | sort -u | tr '\n' ':')
+printf '#!/bin/sh\nexec "%s/usr/bin/qemu-system-aarch64" -L "%s/usr/share/qemu" "$@"\n' $Q $Q > $Q/qemu-system-aarch64
+chmod +x $Q/qemu-system-aarch64
+export PATH=$Q:$PATH LD_LIBRARY_PATH=$LIBPATH
+```
+
+实测输出（2026-10-24）：
+
+```
+UNIXNU: UniXNU 0.1.0 starting as application, firmware Ubuntu distribution of EDK II
+UNIXNU: config: loaded \EFI\UniXNU\unixnu.toml
+UNIXNU: config: 3 entries, 0 drivers, ...
+UNIXNU: menu: shown 3 entries, default 0 'hello', timeout 5000 ms
+UNIXNU: menu: timeout, booting default 0
+UNIXNU: boot: entry 'hello' (fuxi: UEFI hello (no XNU))
+UNIXNU: boot: starting \EFI\UniXNU\Payloads\HelloPayload.efi
+UNIXNU-HELLO: Hello from the UniXNU test payload
+SMOKE PASS
+```
+
+![QEMU 中的 UniXNU 菜单](images/qemu-menu.png)
+
+这证明：Linux 上编出的 `UniXNU.efi` 可执行、FAT 卷布局和 `unixnu.toml` 解析正确、
+菜单能显示、EFI 条目能从 `Payloads/` 加载。**剩下的未知只有 fuxi 固件本身和 XNU 内核。**
+
+## 6. 实测记录（2026-10-24）
 
 - EDK2 BaseTools 用系统 gcc 就能编过，只需要 `uuid/uuid.h` 和 `-luuid`；
 - `unixnu build package` 产出 `UniXNU.efi`/`UniXNUDxe.efi`/...；

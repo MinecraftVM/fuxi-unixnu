@@ -24,6 +24,16 @@
 3. 用 fuxi 自己的 v3 打包器生成**原厂 ABL 能接受的 boot 镜像**（`unixnu bootimg` 只能出 v0）；
 4. 中文的部署、验证、排障、回滚步骤（[`docs/DEPLOY.zh.md`](docs/DEPLOY.zh.md)）。
 
+## 验证到哪一步了
+
+| 验证项 | 状态 | 证据 |
+| --- | --- | --- |
+| Linux 上编出 UniXNU.efi 和 fuxi 固件卷 | ✅ 实测 | `docs/BUILD-LOCAL.zh.md` 第 6 节 |
+| boot.img 结构（v3、BootShim、gzip、DTB、ramdisk） | ✅ 实测 | `boot.json` 逐段回读 |
+| QEMU/AAVMF 上跑 UniXNU 菜单并启动 EFI payload | ✅ 实测 | `docs/BUILD-LOCAL.zh.md` 第 5 节 + 截图 |
+| fuxi 真机固件 | ⏳ 待你测 | `boot-uefi-only.img` |
+| macOS 上编 XNU 内核 | ⏳ 待 Actions | workflow `mode=full` |
+
 ## 两种构建模式
 
 | 模式 | 产物 | 用途 | 需要 Apple 输入 |
@@ -110,6 +120,7 @@ docs/FULL-MODE.zh.md               full 模式已知缺口：静态库链与 pre
 scripts/gpt-userdata.py            从 GPT 转储读 userdata 的 LBA（board.toml 用）
 scripts/blob-scan.py               从 xbl_config 转储核对固件卷窗口（[uefi_fd]）
 scripts/diagnose-logs.py           失败日志归类（library not found / prelink / 工具缺失…）
+scripts/qemu-smoke.sh              QEMU/AAVMF 冒烟测试（已验证 UniXNU + payload 链路）
 ```
 
 ## 上游版本固定
