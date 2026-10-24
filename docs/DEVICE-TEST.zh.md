@@ -567,3 +567,23 @@ vendor_boot 的 ramdisk 会被加载（`/chosen` 指向它）。
 1. **改 vendor_boot 并刷入**：把 payload 追加进 vendor ramdisk，需要官方 vendor_boot 备份以便回滚；
 2. **给固件加 UFS 块设备驱动**：从分区读 payload，高通平台相关，工作量大（FD 只有 3 MiB）；
 3. **USB 主机驱动**：高通 USB 是平台设备，通用 XHCI 驱动大概率枚举不到。
+## 1q. 低内存探测：payload 在固件看不到的地方（2026-10-24）
+
+```
+FUXIRAMDISK: hint=00000000005059D4
+LOWMEM: start
+LOWMEM: try 00000000005059d4      ← 停在这里
+```
+
+- SEC 的 `PayloadBase = x1 + 3 MiB` 是 **0x5059D4（约 5 MB）**，说明 ABL 把 boot image
+  解压到了前几 MB；
+- UEFI 内存映射里没有这块区域（anywhere 扫描看不到 0x04… 开头的描述符）；
+- 驱动直接读 0x5059D4 **触发 fault**，画面停在该行——低内存没有建立页表映射。
+
+因此 **`fastboot boot` 携带 payload 的通道全部不可用**（六种传输 + 低内存直读）。
+
+剩余选项：
+
+1. **在固件里映射低内存**：给 `MemoryPeim`/`PlatformPeiLib` 增加 0x0..0x1000000 的
+   Reserved 区域，让 CPU 驱动建立映射，再读 ABL 的 boot buffer。实验性强，可能影响启动稳定性；
+2. **改 vendor_boot**（工具已就绪，需要官方镜像与刷写授权）。
