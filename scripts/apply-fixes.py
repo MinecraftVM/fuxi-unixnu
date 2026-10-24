@@ -1129,7 +1129,6 @@ def main() -> int:
         set_min_payload(Path(args.uefi), args.min_payload_mib)
     if args.lz4_payload:
         enable_lz4_payload(Path(args.uefi))
-    enable_sheng_pmgr(Path(args.device))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)

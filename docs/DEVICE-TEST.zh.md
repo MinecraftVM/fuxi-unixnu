@@ -619,3 +619,19 @@ python3 fuxi-unixnu/scripts/vendor-boot-payload.py replace-ramdisk \
 fastboot flash vendor_boot_b out/vendor_boot_b_xnu.img
 fastboot boot <firmware-only boot.img>
 ```
+## 1t. XNU 真机启动到 AMFI（2026-10-24）
+
+```
+AMFI: No PMGR?% @ConfigurationSettings.cpp:235
+TCR=0x000000022a51a251a  SCTLR=0x000000003454593d
+pages=0x...  free=0x...
+```
+
+- 内核完成 pmap/平台专家早期初始化，进入 **AMFI**（原始 kext）；
+- AMFI 需要 **PMGR**（电源管理）服务，我们的 console 配置没有它，panic；
+- `amfi_get_out_of_my_way=1` 不覆盖这个检查；
+- sheng 的 PMGR 归档（`build-sheng-platform-power.py`）硬编码了 sheng kernelcache 的符号地址，
+  fuxi 的 iPad kernelcache 不匹配，且需要 prelink 候选，无法直接复用。
+
+结论：**XNU 内核已经在 fuxi 上跑起来**；下一步是 PMGR 集成（平台相关），
+需要重新qualify sheng 的 PMGR 归档或提供 fuxi 侧的 PMGR nub。
