@@ -53,7 +53,7 @@ on:
         default: hanzi123-bilp/uefi-fuxi
       uefi_ref:
         description: "Mu-Silicium ref"
-        default: a7f42bfc27dc33fa2ebf3c99752f2cd75a1def34
+        default: ee589bc56d78be13108bc78e1a987cc06147722e
       fd_base:
         description: "optional override of [uefi_fd] base (leave empty: 0xA7100000 as checked in)"
         default: ""
