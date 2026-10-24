@@ -73,8 +73,8 @@
 - **没有在真机上端到端验证**：写这份文档的环境没有 macOS、也没有连着的手机；
   内核/载荷/boot.img 的构建逻辑是按上游驱动+官方文档写的，第一次跑 Actions 可能会在
   内核或 EDK2 步骤报错——日志会随 artifact 上传。
-- `[uefi_fd]` 的 4 MiB 是上游注释里记录的本机值；如果 ABL 实际窗口不同，固件会起不来，
-  需要回到 `fastboot boot` 前的状态重新确认（`uefiplatLA.cfg`）。
+- 固件卷布局用的是上游 `ad576f83` 之后的 **0xA7100000 / 0x300000**（1 MiB 保留 + 3 MiB FD，
+  和 pipa/nabu/marble 一致）。文件头的旧注释还写着 4 MiB，那是历史遗留，不要照着改。
 - ADT 的 `dram_size = 0x80000000` 和 `owned_memory_size = 0x130000000` 沿用 sheng，
   fuxi 是 12 GB 机型，后续要按 `/memory` 的实际值调整。
 - `board.toml` 的 `[userdata]` LBA 是 512 GB 版本的；256 GB 版本必须重读 GPT。

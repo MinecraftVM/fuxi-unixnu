@@ -121,9 +121,11 @@ jobs:
 
       - name: Install host tools
         run: |
+          # Homebrew LLVM stays off PATH on purpose: XNU must be built with
+          # Xcode's clang and ld64. The driver finds the keg-only LLVM through
+          # its own tool search, and self/scripts/pack-bootimg-v3.py looks in
+          # /opt/homebrew/opt/{llvm,lld}/bin directly.
           brew install llvm lld mtools dtc unifdef
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
-          echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
 
       - name: Report the toolchain
         run: |
@@ -134,8 +136,11 @@ jobs:
           clang --version | head -n 1
           "$(brew --prefix llvm)/bin/clang" --version | head -n 1
           python3 --version
-          for tool in clang llvm-objcopy llvm-nm ld.lld mformat mcopy unifdef; do
+          for tool in clang mformat mcopy unifdef ld.lld; do
             printf '%-12s %s\n' "$tool" "$(command -v "$tool" || echo MISSING)"
+          done
+          for tool in llvm-objcopy llvm-nm; do
+            printf '%-12s %s\n' "$tool" "$(brew --prefix llvm)/bin/$tool"
           done
           df -h "$GITHUB_WORKSPACE"
 
