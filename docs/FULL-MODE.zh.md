@@ -76,10 +76,30 @@ cp out/<board>/kernel/kernel.macho out/<board>/tree/build/native-prelink/<candid
 `native-defaults-candidate` 和 `native-apfs-load-positive`。但 fuxi 仓库里
 **没有** bootstrap_defconfig，也没有作者用的 pre_build 配方，所以这一段只能算推断。
 
-## 3. 因此建议的推进方式
+## 3. 备选：workflow 里把 config 选成 console（本仓库的实验路径）
+
+既然上游配置在新 checkout 上很可能缺归档，这个仓库给了一条**可选**的旁路：
+
+- 写入 `configs/fuxi_console_defconfig`，只保留能从源码归档链接出来的东西：
+  `corecrypto`（普通 + namespaced）、`libpthread-kernel`、`ArmDTPlatform`、`ArmCpu`；
+- 同步把 `board.toml` 的 `[kernel] defconfig` 和 `archives` 改成这 5 项，
+  避免 defconfig 和归档列表对不上；
+- 不碰固件、payload、内核参数、ADT。
+
+预期效果：全新 CI checkout 也能编出 `kernel.macho`（不再依赖 NativeAES / boot progress /
+UFS / legacy display 的 prelink 候选）。代价是**没有 boot progress 图层**，
+屏幕输出主要靠 payload 步骤打进内核的 panic 屏；触控/显示/存储仍然没有。
+
+风险要说清楚：这是本仓库的实验配置，**没有在 macOS 或真机上验证过**。
+如果链接仍缺符号，日志会直接告诉我们缺哪个 archive，再按日志补。
+
+## 4. 因此建议的推进方式
 
 1. 先跑通 `uefi` 模式（有现成镜像，见 README）。
-2. 再跑 `full`，**接受第一次可能失败**；失败后：
+2. 再跑 `full`，**接受第一次可能失败**。两次尝试：
+   - `config=upstream`：上游原样，先看真实错误；
+   - `config=console`：只从源码归档链接，绕开 prelink 依赖。
+   失败后：
 
    ```sh
    # 下载 artifact，解压出 logs/
@@ -91,13 +111,13 @@ cp out/<board>/kernel/kernel.macho out/<board>/tree/build/native-prelink/<candid
 3. 把 `diagnose-logs.py` 的输出 + `unixnu/out/fuxi/logs/kernel.log` 最后 50 行发回来，
    我按日志决定是“加 BUILD_ARCHIVES 并去掉 storage 归档”，还是“补 pre_build 的 bootstrap 配方”。
 
-## 4. 为什么我不直接改 defconfig
+## 5. 为什么默认不改上游 defconfig
 
 - 上游正在高频推进（2026-10-22 ~ 10-24 几十个提交），今天补的静态库链明天可能就被作者自己的重构取代；
 - 这些改动只有 macOS 上跑一次内核构建才能验证，我这边没有 Xcode，改了也无法证明是对的；
 - 默认保持上游可复现，把“已知缺口 + 触发条件 + 修法”写清楚，比猜一个必挂的配置更有用。
 
-## 5. 已确认可用的部分
+## 6. 已确认可用的部分
 
 - EDK II 固件、UniXNU 包、BootShim、v3 打包在 Linux 上实测可复现（见 `BUILD-LOCAL.zh.md`）；
 - `payload` 步骤的输入我们全部静态检查过：

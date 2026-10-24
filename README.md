@@ -41,6 +41,7 @@
    | 输入 | 建议 |
    | --- | --- |
    | mode | 第一次选 `uefi`，通过后再选 `full` |
+   | config | `upstream`（默认）或 `console`（实验：绕开需要 prelink 候选的归档） |
    | chip_id | `full` 必填，16 位十六进制：`openssl rand -hex 8` |
    | 其他 | 保持默认（上游按 commit 固定） |
 

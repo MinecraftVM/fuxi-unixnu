@@ -19,14 +19,19 @@ on:
         type: choice
         options: [full, uefi]
         default: full
+      config:
+        description: "upstream = the repository as checked in; console = experimental source-only archives"
+        type: choice
+        options: [upstream, console]
+        default: upstream
       chip_id:
         description: "platform seed (16 hex digits, e.g. 0123456789abcdef); required by mode=full"
         required: false
         default: ""
       defconfig:
-        description: "defconfig in the device repository"
-        required: true
-        default: fuxi_defconfig
+        description: "defconfig in the device repository (empty: follows config)"
+        required: false
+        default: ""
       unixnu_repo:
         description: "UniXNU build driver repository"
         default: UniXNU/UniXNU
@@ -73,8 +78,9 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   UNIXNU_DEVICE: ${{ github.workspace }}/device
   UNIXNU_UEFI: ${{ github.workspace }}/uefi
-  DEFCONFIG: ${{ inputs.defconfig }}
   MODE: ${{ inputs.mode }}
+  CONFIG_MODE: ${{ inputs.config }}
+  DEFCONFIG_INPUT: ${{ inputs.defconfig }}
   FD_BASE: ${{ inputs.fd_base }}
   FD_SIZE: ${{ inputs.fd_size }}
   CHIP_ID: ${{ inputs.chip_id }}
@@ -154,12 +160,22 @@ jobs:
           if [ -n "$FD_BASE" ] && [ -n "$FD_SIZE" ]; then
             args+=(--fd-base "$FD_BASE" --fd-size "$FD_SIZE")
           fi
+          if [ "$CONFIG_MODE" = console ]; then
+            args+=(--console)
+            echo "experimental console configuration: source-only archives, no NativeAES/BootProgress/UFS"
+          fi
           python3 self/scripts/apply-fixes.py --uefi uefi --device device "${args[@]}"
 
       - name: Select the device
+        id: device
         run: |
+          defconfig="$DEFCONFIG_INPUT"
+          if [ -z "$defconfig" ]; then
+            if [ "$CONFIG_MODE" = console ]; then defconfig=fuxi_console_defconfig; else defconfig=fuxi_defconfig; fi
+          fi
+          echo "defconfig=$defconfig" >> "$GITHUB_OUTPUT"
           cd unixnu
-          ./unixnu defconfig "$DEFCONFIG"
+          ./unixnu defconfig "$defconfig"
           ./unixnu status
 
       - name: Fetch the build sources
@@ -255,7 +271,7 @@ jobs:
             echo
             echo "| Item | Value |"
             echo "| --- | --- |"
-            echo "| defconfig | $DEFCONFIG |"
+            echo "| defconfig | ${{ steps.device.outputs.defconfig }} |"
             echo "| device | ${{ inputs.device_repo }}@${{ inputs.device_ref }} |"
             echo "| uefi | ${{ inputs.uefi_repo }}@${{ inputs.uefi_ref }} |"
             echo "| firmware base/size | ${FD_BASE:-$(sed -n 's/^base = //p' uefi/Resources/Configs/fuxi.toml | head -1)} / ${FD_SIZE:-$(sed -n 's/^size = //p' uefi/Resources/Configs/fuxi.toml | head -1)} |"

@@ -1,0 +1,27 @@
+# Experimental console-only configuration for fuxi (stage 2a, fresh CI checkout).
+#
+# Why this file exists: the upstream fuxi_defconfig enables NativeAES and the
+# boot-progress layer, whose archives need a prelink candidate
+# (build/native-prelink/*-candidate.macho) that no repository carries, and it
+# leaves CONFIG_XNU_BUILD_ARCHIVES unset, so the archives the link needs are
+# never built. See docs/FULL-MODE.zh.md.
+#
+# This configuration keeps only what links from source archives:
+#   corecrypto (plain + namespaced), libpthread-kernel, ArmDTPlatform, ArmCpu
+# Crypto bootstrap stays "prelinked": the original kernelcache provides the
+# closure, the link only adds the namespaced corecrypto archive.
+#
+# No NativeAES, no BootProgress, no legacy display stub, no UFS, no Adreno.
+# The kernel can reach the platform expert and panic on the missing root; the
+# payload step patches the panic screen into this kernel.
+
+CONFIG_XNU_BUILD_ARCHIVES=y
+CONFIG_XNU_SOURCE_CORECRYPTO14=y
+CONFIG_XNU_SOURCE_PTHREAD=y
+CONFIG_XNU_ARM_DT_PLATFORM=y
+CONFIG_XNU_ARMCPU=y
+CONFIG_XNU_TRUST_CACHE_RUNTIME=y
+CONFIG_XNU_DT_PANIC_REGION=y
+CONFIG_XNU_NATIVE_ARCH_TIMER=y
+CONFIG_XNU_NATIVE_PAN=y
+CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"

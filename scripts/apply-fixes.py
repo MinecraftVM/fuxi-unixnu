@@ -1,39 +1,51 @@
 #!/usr/bin/env python3
 """Apply the fuxi build fixes to the checked-out device and UEFI repositories.
 
-Both edits are idempotent and print a unified diff. They exist because the
-upstream port carries values copied from sheng where the fuxi numbers differ.
+Every edit is idempotent and prints a unified diff; the files keep their CRLF
+line endings.
 
-1. uefi/Resources/Configs/fuxi.toml, [uefi_fd] -- OPT-IN only
-
-   The header of that file still says 0xA7000000 / 0x400000 while the table says
-   0xA7100000 / 0x300000. That is intentional: commit ad576f83 ("use the 3 MiB FD
-   layout every working device uses") moved the image to 1 MiB reserved plus a
-   3 MiB FD inside the stock 4 MiB window, and updated fuxi.fdf and MemoryMapLib
-   with it. The stale comment is kept here only as a note. Do not override the
-   layout unless you are testing it on hardware: --fd-base and --fd-size change
-   it explicitly.
-
-2. device/board.toml, [[bootimg.dtb_node]]
+1. device/board.toml, [[bootimg.dtb_node]]
 
    The port adds /reserved-memory/splash_region to the boot image device tree,
    but the fuxi device tree (Resources/DTBs/fuxi.dtb) already carries it:
-   reg = <0x0 0xb8000000 0x0 0x2b00000>. fdtput cannot create an existing node,
-   and the v3 packer used here appends the device tree unmodified, so the entry
-   is removed instead of being applied.
+   reg = <0x0 0xb8000000 0x0 0x2b00000>. The v3 packer used here appends the
+   device tree unmodified, and fdtput cannot create an existing node.
 
-Both files upstream use CRLF line endings; every write keeps them.
+2. Optional: --console (experimental console-only configuration)
+
+   The upstream fuxi_defconfig enables NativeAES and the boot-progress layer.
+   Their archives need a prelink candidate no repository carries, and the
+   configuration leaves CONFIG_XNU_BUILD_ARCHIVES unset, so a fresh checkout
+   never builds the archives the link wants. --console selects a configuration
+   built only from source archives: corecrypto, libpthread, ArmCpu and
+   ArmDTPlatform. It also rewrites [kernel] defconfig and archives in board.toml
+   so the two stay consistent. See docs/FULL-MODE.zh.md.
+
+The firmware layout in uefi/Resources/Configs/<device>.toml is left alone by
+default: the values checked in (0xA7100000 / 0x300000) come from upstream
+commit ad576f83 and a stale header comment still mentions 4 MiB. --fd-base and
+--fd-size override them explicitly for on-device A/B.
 """
 from __future__ import annotations
 
 import argparse
 import difflib
 import re
+import shutil
 import sys
 from pathlib import Path
 
 TABLE = re.compile(r"^\[\[?\s*([^\]]+?)\s*\]\]?\s*(?:#.*)?$")
 KEY = re.compile(r"^(\s*)([A-Za-z_][\w-]*)(\s*)=.*$")
+
+CONSOLE_DEFCONFIG = "fuxi_console_defconfig"
+CONSOLE_ARCHIVES = [
+    "build-corecrypto-14.py",
+    "build-corecrypto-14.py --namespace",
+    "build-arm-driver.py ArmDTPlatform",
+    "build-arm-driver.py ArmCpu",
+    "build-libpthread-kernel.py",
+]
 
 
 def read_text(path: Path) -> tuple[str, bool]:
@@ -64,9 +76,7 @@ def rewrite(path: Path, before: str, after: str, label: str, crlf: bool) -> bool
 
 def set_uefi_fd(text: str, base: str, size: str) -> str:
     """Set base and size inside the [uefi_fd] table, keeping every comment."""
-    lines = text.splitlines(True)
-    inside = False
-    seen = set()
+    lines, inside, seen = text.splitlines(True), False, set()
     for index, line in enumerate(lines):
         header = TABLE.match(line.strip())
         if header:
@@ -96,8 +106,49 @@ def drop_table(text: str, name: str) -> str:
                 continue
         if not skipping:
             kept.append(line)
-    result = "".join(kept)
-    return result.rstrip("\n") + "\n"
+    return "".join(kept).rstrip("\n") + "\n"
+
+
+def set_key(text: str, table: str, key: str, value: str) -> str:
+    """Set key = value inside a table, keeping indentation and comments."""
+    lines, inside, done = text.splitlines(True), False, False
+    for index, line in enumerate(lines):
+        header = TABLE.match(line.strip())
+        if header:
+            inside = header.group(1) == table
+            continue
+        match = KEY.match(line)
+        if inside and match and match.group(2) == key:
+            lines[index] = f"{match.group(1)}{key} = {value}\n"
+            done = True
+    if not done:
+        raise SystemExit(f"[{table}] has no {key}: the device config changed")
+    return "".join(lines)
+
+
+def set_archives(text: str, entries: list[str]) -> str:
+    """Replace the [kernel] archives array with the given entries."""
+    lines, out, inside_kernel, inside_array, done = text.splitlines(True), [], False, False, False
+    for line in lines:
+        stripped = line.strip()
+        header = TABLE.match(stripped)
+        if header:
+            inside_kernel = header.group(1) == "kernel"
+        if not inside_array and inside_kernel and stripped.startswith("archives = ["):
+            out.append("archives = [\n")
+            out += [f'  "{entry}",\n' for entry in entries]
+            out.append("]\n")
+            done = True
+            inside_array = "]" not in stripped.split("[", 1)[1]
+            continue
+        if inside_array:
+            if stripped.startswith("]"):
+                inside_array = False
+            continue
+        out.append(line)
+    if not done:
+        raise SystemExit("[kernel] has no archives array: the device config changed")
+    return "".join(out)
 
 
 def check_settings(path: Path, text: str) -> None:
@@ -111,6 +162,22 @@ def check_settings(path: Path, text: str) -> None:
             print(f"warning: {path.name} has requires_kernel_header = {header.group(1)}")
 
 
+def enable_console(board: Path, device: Path, text: str) -> str:
+    """Write the console defconfig and make board.toml select it with its own archive list."""
+    template = Path(__file__).resolve().parents[1] / "overrides" / CONSOLE_DEFCONFIG
+    if not template.is_file():
+        raise SystemExit(f"{template} missing: this script is not running from the repository")
+    configs = device / "configs"
+    if not configs.is_dir():
+        raise SystemExit(f"{configs} missing: is --device a unixnu device repository?")
+    shutil.copyfile(template, configs / CONSOLE_DEFCONFIG)
+    print(f"console: wrote {configs / CONSOLE_DEFCONFIG}")
+    text = set_key(text, "kernel", "defconfig", f'"{CONSOLE_DEFCONFIG}"')
+    text = set_archives(text, CONSOLE_ARCHIVES)
+    print(f"console: [kernel] defconfig = {CONSOLE_DEFCONFIG}, {len(CONSOLE_ARCHIVES)} archives")
+    return text
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--uefi", required=True, help="uefi-fuxi checkout")
@@ -118,10 +185,13 @@ def main() -> int:
     parser.add_argument("--config", default="fuxi", help="device config name (default: fuxi)")
     parser.add_argument("--fd-base", default="", help="override [uefi_fd] base (opt-in; default: leave the file alone)")
     parser.add_argument("--fd-size", default="", help="override [uefi_fd] size (opt-in; default: leave the file alone)")
+    parser.add_argument("--console", action="store_true",
+                        help="select the experimental console-only defconfig and archive list")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
-    board = Path(args.device) / "board.toml"
+    device = Path(args.device)
+    board = device / "board.toml"
     for path in (uefi_config, board):
         if not path.is_file():
             raise SystemExit(f"{path} not found: check --uefi and --device")
@@ -135,13 +205,16 @@ def main() -> int:
         print(f"{uefi_config} [uefi_fd]: left as checked in (pass --fd-base and --fd-size to override)")
 
     board_text, board_crlf = read_text(board)
+    before = board_text
     if "[[bootimg.dtb_node]]" in board_text:
-        rewrite(board, board_text, drop_table(board_text, "bootimg.dtb_node"),
-                f"{board} [[bootimg.dtb_node]]", board_crlf)
+        board_text = drop_table(board_text, "bootimg.dtb_node")
+    if args.console:
+        board_text = enable_console(board, device, board_text)
+    if board_text != before:
+        rewrite(board, before, board_text, f"{board} edits", board_crlf)
     else:
-        print(f"{board} [[bootimg.dtb_node]]: already applied")
+        print(f"{board}: already applied")
 
-    # Report the layout the firmware and the packer must agree on.
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)
     size = re.search(r"^size\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)
