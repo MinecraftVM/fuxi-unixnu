@@ -1,3 +1,26 @@
+--- a/iokit/Kernel/IOService.cpp
++++ b/iokit/Kernel/IOService.cpp
+@@ -45,6 +45,7 @@
+ #include <IOKit/IOPlatformExpert.h>
+ #include <IOKit/IOMessage.h>
+ #include <IOKit/IOLib.h>
++#include <kern/debug.h>
+ #include <IOKit/IOKitKeysPrivate.h>
+ #include <IOKit/IOBSD.h>
+ #include <IOKit/IOUserClient.h>
+@@ -488,6 +489,12 @@
+ 
+ 	PE_parse_boot_argn("dextrelaunch", &gIODextRelaunchMax, sizeof(gIODextRelaunchMax));
+ 	PE_parse_boot_argn("iocthreads", &gMaxConfigThreads, sizeof(gMaxConfigThreads));
++
++	{
++		int sheng_pmgr_stub_value = 0;
++		boolean_t sheng_pmgr_stub_parsed = PE_parse_boot_argn("sheng-pmgr-stub", &sheng_pmgr_stub_value, sizeof(sheng_pmgr_stub_value));
++		panic("SHENG-PMGR-STUB: early hook parsed=%d value=%d", sheng_pmgr_stub_parsed, sheng_pmgr_stub_value);
++	}
+ 
+ 	gIOUserClientClassKey = OSSymbol::withCStringNoCopy( kIOUserClientClassKey );
+ 
 --- a/iokit/bsddev/IOKitBSDInit.cpp
 +++ b/iokit/bsddev/IOKitBSDInit.cpp
 @@ -35,6 +35,7 @@
@@ -8,33 +31,28 @@
  
  extern "C" {
  #include <libkern/amfi/amfi.h>
-@@ -110,6 +111,34 @@
+@@ -110,6 +111,29 @@
  kern_return_t
  IOKitBSDInit( void )
  {
-+	/* Console bring-up: publish the prelinked ApplePMGRNub class so AMFI finds a
-+	 * PMGR provider. The provider slot is cleared, which makes the original read
-+	 * stub return 0xffffffff and the write stub a no-op. Opt-in boot argument.
-+	 */
 +	{
 +		int sheng_pmgr_stub = 0;
 +		if (PE_parse_boot_argn("sheng-pmgr-stub", &sheng_pmgr_stub, sizeof(sheng_pmgr_stub)) && sheng_pmgr_stub) {
 +			const OSMetaClass *meta = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("ApplePMGRNub"));
 +			if (meta == nullptr) {
-+				IOLog("sheng-pmgr-stub: ApplePMGRNub class missing\n");
++				panic("SHENG-PMGR-STUB: late hook, ApplePMGRNub class missing");
 +			} else {
 +				IOService *nub = (IOService *)meta->alloc();
 +				if (nub == nullptr) {
-+					IOLog("sheng-pmgr-stub: alloc failed\n");
++					panic("SHENG-PMGR-STUB: late hook, alloc failed");
 +				} else {
 +					uintptr_t slot = (uintptr_t)nub + 0x440;
 +					*(void **)slot = nullptr;
 +					if (!nub->init()) {
-+						IOLog("sheng-pmgr-stub: init failed\n");
-+						nub->release();
++						panic("SHENG-PMGR-STUB: late hook, init failed");
 +					} else {
 +						nub->registerService();
-+						IOLog("sheng-pmgr-stub: ApplePMGRNub published\n");
++						panic("SHENG-PMGR-STUB: late hook, published");
 +					}
 +				}
 +			}
