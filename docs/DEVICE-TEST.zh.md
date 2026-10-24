@@ -364,6 +364,28 @@ FUXIRAMDISK: payload at ... in the hint region        ← 命中
 2. `hello-64`（64 MiB）：全 0 的话，验证是不是大小限制；
 3. `hello-64gz`（1.9 MB）：验证 ABL 是不是期待压缩 ramdisk。
 
+## 1m. 非对齐偏移：为什么 512 B 扫描永远找不到
+
+对比两次真机日志：
+
+| 镜像 | initrd | size |
+| --- | --- | --- |
+| `kdtb`（ramdisk 空） | `B62B5000..B7FFEBB9` | `0x1D48BB9`（30.7 MB） |
+| 64 MiB ramdisk | `B22B5000..B7FFEBB9` | `0x5D48BB9`（97.8 MB） |
+
+差值正好 `0x4000000`（64 MiB），说明 ABL 把 boot image 的 ramdisk **接在 vendor ramdisk 后面**，
+起始地址是 `initrd-start + vendor_size`：
+
+```
+B22B5000 + 1D48BB9 = B3FFFBB9
+```
+
+末尾是 `…B9`，**不是 512 字节对齐**，所以按 512 B 步长的所有扫描都会跳过去。
+
+新的 `--discover` 在 `[initrd-start, initrd-end)` 内**按字节**搜 `FUXIESP` 标签，命中后回推
+0x47 字节校验 BPB。用一个 97.8 MB 的模拟缓冲验证过：命中 `payload at B3FFFBB9`，BPB 校验通过
+（FAT 内部的少量假标签都被 BPB 检查排除）。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；
