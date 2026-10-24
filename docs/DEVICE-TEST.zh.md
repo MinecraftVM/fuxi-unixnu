@@ -546,3 +546,24 @@ FUXIRAMDISK: anchor +1D48BB9: 7C00BE01 F38000BF 0072EA5 01B80800
 结论：ABL 按 ramdisk 大小扩展了 initrd 范围，但**没有把我们的数据写进去**（或写到了固件看不到的位置）。
 结合固件里没有 UFS/Scsi 块设备驱动，剩余可行通道只有 **kernel 字段**（gzip 版 `kdtb2`、
 非压缩版 `rawk`）和 **DTB 内嵌**（把 payload 放进 FDT 的 totalsize 内）。
+## 1p. 结论：`fastboot boot` 的 payload 通道不可用（2026-10-24）
+
+六种传输全部在真机上试过，日志都是 `no FUXIESP label`：
+
+| 方式 | 镜像 | 结果 |
+| --- | --- | --- |
+| 原始 64 MiB ramdisk | `hello-probe2` | 范围按大小扩展，内容不是 FAT |
+| gzip ramdisk | `hello-gz3` | 不解压、不写入 |
+| LZ4 legacy ramdisk | `hello-lz4dec` | 范围内没有帧 |
+| raw（非 gzip）kernel | `hello-rawk` | 设备卡住，ABL 只接受 gzip |
+| gzip kernel + DTB 后 payload | `hello-kdtb2` | 找不到 |
+| payload 内嵌 FDT totalsize | `hello-dtbpay` | 找不到 |
+
+推断的 ABL 行为：**只提取内核与设备树并重定位，丢弃 boot image 的 ramdisk 与 kernel 字段尾部**；
+vendor_boot 的 ramdisk 会被加载（`/chosen` 指向它）。
+
+剩余可行方向（都需要额外工作或风险）：
+
+1. **改 vendor_boot 并刷入**：把 payload 追加进 vendor ramdisk，需要官方 vendor_boot 备份以便回滚；
+2. **给固件加 UFS 块设备驱动**：从分区读 payload，高通平台相关，工作量大（FD 只有 3 MiB）；
+3. **USB 主机驱动**：高通 USB 是平台设备，通用 XHCI 驱动大概率枚举不到。
