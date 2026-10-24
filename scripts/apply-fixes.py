@@ -519,6 +519,24 @@ def enable_ramdisk_full(uefi: Path) -> None:
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: [%lx] %08x %08x %08x %08x\n", Start, Words[0], Words[1], Words[2], Words[3]));
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: [%lx] %08x %08x %08x %08x\n", Start + 16, Words[4], Words[5], Words[6], Words[7]));
               }
+              if ((mVolumeBase == NULL) && (End > Start) && ((End - Start) < 0x20000000ULL)) {
+                UINT64  Offset;
+                UINT64  Total = 0;
+                UINT8   *Range  = (UINT8 *)(UINTN)Start;
+                UINT64  Length  = End - Start;
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: label scan in %lx..%lx (%lx bytes)\n", Start, End, Length));
+                for (Offset = 0x47; (Offset + 8) <= Length; Offset++) {
+                  if ((Range[Offset] == 'F') && (CompareMem (Range + Offset, "FUXIESP", 8) == 0)) {
+                    UINT64  Candidate = Offset - 0x47;
+                    if (IsPayloadVolume (Range + Candidate, &Total)) {
+                      mVolumeBase  = Range + Candidate;
+                      mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                      DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx (label at +%lx)\n", (UINT64)(UINTN)(Range + Candidate), Candidate));
+                      break;
+                    }
+                  }
+                }
+              }
               {
                 EFI_STATUS             MapStatus;
                 UINTN                  MapSize = 0;
@@ -865,6 +883,22 @@ def set_payload_size(device: Path, size: int) -> None:
     print(f"{board}: [payload] size_mib = {size}")
 
 
+
+def set_min_payload(uefi: Path, mib: int) -> None:
+    """Lower IsPayloadVolume's size floor for a bring-up test with a small volume."""
+    source = uefi / "Platforms/Xiaomi/fuxiPkg/Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.c"
+    text, crlf = read_text(source)
+    old = "64ULL * 1024 * 1024 / FUXI_BLOCK_SIZE"
+    if old not in text:
+        if f"{mib}ULL * 1024 * 1024 / FUXI_BLOCK_SIZE" in text:
+            print(f"{source}: minimum payload already {mib} MiB")
+            return
+        raise SystemExit(f"{source}: size floor not found")
+    text = text.replace(old, f"{mib}ULL * 1024 * 1024 / FUXI_BLOCK_SIZE", 1)
+    write_text(source, text, crlf)
+    print(f"{source}: minimum payload lowered to {mib} MiB")
+
+
 def enable_debug_conout(uefi: Path) -> None:
     """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
 
@@ -948,6 +982,8 @@ def main() -> int:
                         help="scan 256 MiB below the device tree handed over in x0")
     parser.add_argument("--payload-size", type=int, default=0,
                         help="rewrite [payload] size_mib (a bootloader may cap the ramdisk)")
+    parser.add_argument("--min-payload-mib", type=int, default=0,
+                        help="lower IsPayloadVolume's size floor (bring-up test with a small volume)")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -994,6 +1030,8 @@ def main() -> int:
         enable_ramdisk_below_dt(Path(args.uefi))
     if args.payload_size:
         set_payload_size(Path(args.device), args.payload_size)
+    if args.min_payload_mib:
+        set_min_payload(Path(args.uefi), args.min_payload_mib)
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)
