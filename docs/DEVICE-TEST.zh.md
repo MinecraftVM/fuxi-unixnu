@@ -635,3 +635,26 @@ pages=0x...  free=0x...
 
 结论：**XNU 内核已经在 fuxi 上跑起来**；下一步是 PMGR 集成（平台相关），
 需要重新qualify sheng 的 PMGR 归档或提供 fuxi 侧的 PMGR nub。
+## 1u. AMFI/PMGR 已解决，XNU 进入 root 挂载（2026-10-25）
+
+```
+(sheng-pmgr-stub 发布 ApplePMGRNub)
+...
+failed to mount root device
+```
+
+做法（`patches/xnu/zzz-pmgr-stub.patch`，提交 f128aca）：
+
+1. 在 `IOKitBSDInit()` 里（kext 加载已可用的最早时点，且早于 AMFI）：
+   - `OSKextLoadKextWithIdentifier("com.apple.driver.ApplePMGR")`；
+   - 取 `ApplePMGRNub` 元类，`alloc` → provider(+0x440) 清零 → `init`；
+   - `attach(IOService::getPlatform())` → `registerService()` → `start()`（进入 matched 状态）。
+2. AMFI 的 `waitForMatchingService("ApplePMGRNub")` 命中，`No PMGR?` panic 消失。
+
+随后内核走到 **root 挂载**，因 payload 没有根文件系统而失败。
+
+### root 镜像现状
+
+- `out/iosroot/root.img`：16 GiB **HFSX**，卷标 `iOSRoot`，UUID `0e94315f-…`（来自上游 iosroot-build 产物）；
+- 与 ADT 的 `root-match-volume-uuid`（iPadOS APFS 卷）不同，需要按上游 `rd=ufsroot0` + root extents 的方式交给内核；
+- 我们的 UniXNU 路径目前没有存储栈，也没有 extents 支持；上游 `fuxi-loader-build/` 已实现（FIEMAP + ADT extent 表）。
