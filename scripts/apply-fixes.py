@@ -523,7 +523,18 @@ def enable_ramdisk_full(uefi: Path) -> None:
                 UINT64  Total = 0;
                 UINT8   *Range  = (UINT8 *)(UINTN)Start;
                 UINT64  Length  = End - Start;
-                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: label scan in %lx..%lx (%lx bytes)\n", Start, End, Length));
+                UINT64  Anchors[3];
+                UINTN   Anchor;
+                Anchors[0] = Start;
+                Anchors[1] = Start + 0x1D48BB9ULL;
+                Anchors[2] = (End > 0x4000000ULL) ? (End - 0x4000000ULL) : 0;
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: probe v2, label scan %lx..%lx (%lx bytes)\n", Start, End, Length));
+                for (Anchor = 0; Anchor < 3; Anchor++) {
+                  if ((Anchors[Anchor] >= Start) && (Anchors[Anchor] + 16 <= End)) {
+                    UINT32  *W = (UINT32 *)(UINTN)Anchors[Anchor];
+                    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: anchor +%lx: %08x %08x %08x %08x\n", Anchors[Anchor] - Start, W[0], W[1], W[2], W[3]));
+                  }
+                }
                 for (Offset = 0x47; (Offset + 8) <= Length; Offset++) {
                   if ((Range[Offset] == 'F') && (CompareMem (Range + Offset, "FUXIESP", 8) == 0)) {
                     UINT64  Candidate = Offset - 0x47;
@@ -534,6 +545,9 @@ def enable_ramdisk_full(uefi: Path) -> None:
                       break;
                     }
                   }
+                }
+                if (mVolumeBase == NULL) {
+                  DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: no FUXIESP label inside the initrd range\n"));
                 }
               }
               }
