@@ -564,6 +564,65 @@ def enable_ramdisk_full(uefi: Path) -> None:
     write_text(inf, inf_text, inf_crlf)
 
 
+
+def enable_ramdisk_below_dt(uefi: Path) -> None:
+    """Scan 256 MiB below the device tree the previous stage handed over in x0.
+
+    Upstream's own comment says the payload sits just below the device tree. When
+    /chosen does not name it (the ABL leaves the stock initrd values in place), the
+    tree address from gSiliciumEntryArgHobGuid is the only anchor left. The scan is
+    bounded to 256 MiB and every step is reported through DEBUG.
+    """
+    package = uefi / "Platforms/Xiaomi/fuxiPkg"
+    source = package / "Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.c"
+    inf = package / "Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.inf"
+    text, crlf = read_text(source)
+    if "scanning below the device tree" in text:
+        print(f"{source}: below-DT scan already present")
+        return
+    for header in ("#include <Library/DebugLib.h>",):
+        if header not in text:
+            text = text.replace("#include <Uefi.h>\n", "#include <Uefi.h>\n" + header + "\n", 1)
+    anchor = "  if (mVolumeBase == NULL) {"
+    block = r"""  if (mVolumeBase == NULL) {
+    EFI_PEI_HOB_POINTERS   Hob;
+    STATIC CONST EFI_GUID  EntryArgGuid = { 0xDAEE82E6, 0x8090, 0x4E72, { 0xBF, 0xB9, 0x78, 0xC1, 0x3C, 0xD4, 0xE3, 0x59 } };
+
+    Hob.Raw = GetHobList ();
+    while (!END_OF_HOB_LIST (Hob)) {
+      if ((Hob.Header->HobType == EFI_HOB_TYPE_GUID_EXTENSION) &&
+          (CompareGuid (&Hob.Guid->Name, &EntryArgGuid))) {
+        UINT64  Dt = *(UINT64 *)(Hob.Guid + 1);
+        if (Dt > 0x10000000ULL) {
+          UINT64  Probe;
+          UINT64  Total;
+          DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: scanning below the device tree %lx\n", Dt));
+          for (Probe = Dt & ~(UINT64)(FUXI_BLOCK_SIZE - 1); Probe > Dt - 0x10000000ULL; Probe -= FUXI_BLOCK_SIZE) {
+            if (IsPayloadVolume ((UINT8 *)(UINTN)Probe, &Total)) {
+              mVolumeBase  = (UINT8 *)(UINTN)Probe;
+              mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+              DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx below the device tree\n", Probe));
+              break;
+            }
+          }
+        }
+      }
+      Hob.Raw = GET_NEXT_HOB (Hob);
+    }
+  }
+  if (mVolumeBase == NULL) {"""
+    if anchor not in text:
+        raise SystemExit(f"{source}: no-volume anchor missing")
+    text = text.replace(anchor, block, 1)
+    write_text(source, text, crlf)
+    print(f"{source}: below-DT scan inserted")
+
+    inf_text, inf_crlf = read_text(inf)
+    if "DebugLib" not in inf_text:
+        anchor = "[LibraryClasses]\n"
+        write_text(inf, inf_text.replace(anchor, anchor + "  DebugLib\n", 1), inf_crlf)
+
+
 def enable_debug_conout(uefi: Path) -> None:
     """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
 
@@ -643,6 +702,8 @@ def main() -> int:
                         help="print /chosen linux,initrd-start/end from the DT the ABL handed over in x0")
     parser.add_argument("--ramdisk-full", action="store_true",
                         help="after the hint misses, try /chosen, the kernel window and conventional memory")
+    parser.add_argument("--ramdisk-below-dt", action="store_true",
+                        help="scan 256 MiB below the device tree handed over in x0")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -685,6 +746,8 @@ def main() -> int:
         enable_dt_chosen(Path(args.uefi))
     if args.ramdisk_full:
         enable_ramdisk_full(Path(args.uefi))
+    if args.ramdisk_below_dt:
+        enable_ramdisk_below_dt(Path(args.uefi))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)

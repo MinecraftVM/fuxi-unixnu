@@ -283,6 +283,27 @@ FUXIRAMDISK: chosen window scan +-4 MiB
 FUXIRAMDISK: payload at 0x... near chosen initrd     ← 命中
 ```
 
+### 再补一层：以设备树为锚点向下扫（`boot-uefi-hello-dt.img`）
+
+上游注释写的是“payload 就在设备树正下方”。如果 ABL 没有改 `/chosen`（还是原厂的
+`initrd-start`），那 `/chosen` 就指不到我们的卷，这时唯一可靠的锚点是 **x0 指向的设备树**。
+
+`boot-uefi-hello-dt.img` 在其它尝试之前先做：
+
+```
+FUXIRAMDISK: scanning below the device tree 0x...
+FUXIRAMDISK: payload at 0x... below the device tree
+```
+
+扫描窗口是设备树下方 256 MiB（按 512 B 步长），覆盖“在同一块 bootloader 缓冲里、紧挨着 DT”的情况。
+
+关于 OCR 出来的数值：
+
+- `base=…C4C2914`：`%lx` 不带前导零，所以它其实很可能是 **`0x0C4C2914`**（≈206 MB），
+  低于上游新扫描的门槛 `0x40000000`，所以上游那个 128 MiB 扫描在 fuxi 上**不会执行**；
+- `x0=…7A085000`：很可能丢了最高位，真实值是 **`0xBA085000`** 一类的高地址（正好在
+  Kernel 窗口尾部/紧邻），和“payload 在 DT 下方”的说法一致。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；
