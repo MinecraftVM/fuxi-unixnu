@@ -7,15 +7,17 @@
 # never built. See docs/FULL-MODE.zh.md.
 #
 # This configuration keeps only what links from source archives:
-#   corecrypto (plain + namespaced), libpthread-kernel, ArmDTPlatform, ArmCpu,
-#   the board boot-progress archive and the legacy display stub.
+#   corecrypto (plain + namespaced), libpthread-kernel, ArmDTPlatform, ArmCpu
+#   and the legacy display stub.
 # Crypto bootstrap stays "prelinked": the original kernelcache provides the
 # closure, the link only adds the namespaced corecrypto archive.
 #
-# Boot progress is kept on purpose: it is the only thing that draws before any
-# display driver exists, and its board observer retains the UEFI GOP mapping the
-# payload's panic screen falls back to. Dropping it would leave a booting kernel
-# with no visible output at all.
+# Boot progress is NOT enabled: build-xnu-4k-baseline.sh refuses it unless
+# NATIVE_UFS, OWNER_ROOT_AUDIT, NATIVE_VIRTIO_BLOCK and SOURCE_CORECRYPTO14 are
+# all on, and those pull the prelink candidates a fresh checkout does not have.
+# The kernel therefore has no on-screen console by itself; DarwinBoot's handoff
+# logs and UniXNU stay visible, and panic output needs a framebuffer source that
+# a later configuration adds.
 #
 # No NativeAES, no UFS, no Adreno, no owner-root/storage stack.
 
@@ -28,6 +30,5 @@ CONFIG_XNU_TRUST_CACHE_RUNTIME=y
 CONFIG_XNU_DT_PANIC_REGION=y
 CONFIG_XNU_NATIVE_ARCH_TIMER=y
 CONFIG_XNU_NATIVE_PAN=y
-CONFIG_XNU_BOOT_PROGRESS=y
 CONFIG_XNU_EXTRA_LD_ARCHIVES="{tree}/build/legacy-stub/libLegacyStub.a"
 CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"
