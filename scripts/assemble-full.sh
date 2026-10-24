@@ -15,6 +15,7 @@ fd=""
 out="$ROOT/out/boot-fuxi.img"
 python=${PYTHON:-python3}
 gzip_ramdisk=0
+payload_size=0
 
 usage() {
   cat <<EOF
@@ -40,6 +41,7 @@ while [ $# -gt 0 ]; do
     --uefi) uefi=$2; shift 2 ;;
     --fd) fd=$2; shift 2 ;;
     --out) out=$2; shift 2 ;;
+    --payload-size) payload_size=$2; shift 2 ;;
     --gzip-ramdisk) gzip_ramdisk=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -62,6 +64,11 @@ fi
 if ! [[ "$chip" =~ ^[0-9A-Fa-f]{1,16}$ ]]; then
   echo "--chip-id must be 1-16 hex digits: $chip" >&2
   exit 2
+fi
+
+if [ "$payload_size" != 0 ]; then
+  echo "== payload volume size $payload_size MiB"
+  "$python" "$ROOT/fuxi-unixnu/scripts/apply-fixes.py" --uefi "$uefi" --device "$device" --payload-size "$payload_size"
 fi
 
 echo "== payload"
