@@ -79,3 +79,7 @@
   fuxi 是 12 GB 机型，后续要按 `/memory` 的实际值调整。
 - `board.toml` 的 `[userdata]` LBA 是 512 GB 版本的；256 GB 版本必须重读 GPT。
 - 触控/显示/存储驱动都不在这一版里，**进不了用户态**是预期行为。
+- full 模式的上游配置在新 checkout 上很可能缺静态库（`fuxi_defconfig` 没有
+  `CONFIG_XNU_BUILD_ARCHIVES`，而链接仍要 `libBootProgress.a`/`libLegacyStub.a`），
+  且 `CONFIG_XNU_NATIVE_AES=y` 需要 prelink 候选。workflow 提供 `config=console`
+  的实验旁路，只从源码归档链接；细节见 [FULL-MODE.zh.md](FULL-MODE.zh.md)。
