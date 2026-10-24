@@ -34,7 +34,8 @@
 
 ## 4. 未完成项（都需要外部执行）
 
-1. **真机 payload 发现**：`out/boot-uefi-hello-probe2.img` 的三个 anchor hexdump；
+1. **payload 传输**：`fastboot boot` 的六种方式全部在真机验证失败（ABL 只提取内核与设备树）。
+   最后一条路是改 vendor_boot（`scripts/vendor-boot-payload.py`，需要官方镜像与刷写授权）；
 2. **XNU 内核构建**：Actions `mode=kernel, config=console`，成功后本地按
    [ASSEMBLE-LOCAL.zh.md](ASSEMBLE-LOCAL.zh.md) 组装。
 
