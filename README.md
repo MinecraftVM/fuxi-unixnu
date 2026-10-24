@@ -136,6 +136,7 @@ docs/STATUS.zh.md                  移植进度、还缺什么、下一步怎么
 docs/BUILD-LOCAL.zh.md             无 Mac / 无 GitHub 时在 Linux 本地只编固件（实测步骤）
 docs/ASSEMBLE-LOCAL.zh.md          只在云端编内核，payload 和 boot.img 在本地组装
 docs/IMAGES.zh.md                  镜像清单、推荐顺序与 SHA256（含 out/flash-kit 说明）
+docs/HANDOFF.zh.md                 一页交接：已验证项、剩余两步、已知限制
 docs/DEVICE-TEST.zh.md             上机测试协议、数据采集、反馈模板
 docs/FULL-MODE.zh.md               full 模式已知缺口：静态库链与 prelink 候选
 scripts/gpt-userdata.py            从 GPT 转储读 userdata 的 LBA（board.toml 用）
