@@ -97,6 +97,25 @@ NativeLegacyDisplay 的 prelink 候选）。
 风险要说清楚：这是本仓库的实验配置，**没有在 macOS 或真机上验证过**。
 如果链接仍缺符号，日志会直接告诉我们缺哪个 archive，再按日志补。
 
+### console 配置的静态闭环（已逐项核对）
+
+链接阶段要的每个归档，都能由 `configs/fuxi_console_defconfig` + `board.toml` 里那 7 个
+builder 产出，且它们引用的源码在组装后的 `tree/` 里都存在：
+
+| 链接需要 | 生产者 | 源码输入（已在 tree 中核对） |
+| --- | --- | --- |
+| `build/corecrypto-2023/libcorecrypto_kernel_noasm-namespaced.a` | `build-corecrypto-14.py --namespace` | `refer/corecrypto-2023` |
+| `build/armdt-platform/libArmDTPlatform.a` | `build-arm-driver.py ArmDTPlatform` | `drivers/ArmDTPlatform` |
+| `build/armcpu/libArmCpu.a` | `build-arm-driver.py ArmCpu` | `drivers/ArmCpu` |
+| `build/libpthread-kernel/libpthread_kernel.a` + `source_pthread_bootstrap.o` | `build-libpthread-kernel.py` | `refer/libpthread`、`patches/libpthread` |
+| `build/boot-progress/libBootProgress.a` | `build-boot-progress.py` | `kits/sheng/{BootProgress,BootFaultProbe,BootWatchdogPolicy,StageAStorageStubs,StageAProbeStubs}.c`、`kits/VerifiedRoot/src` |
+| `build/legacy-stub/libLegacyStub.a` | `build-legacy-stub.py` | `kits/sheng/LegacyDisplayStub.c` |
+
+这些 builder 只依赖 XNU 的编译记录（`build/xnu/.../*.o.json`，由 driver 的 bootstrap pass 产生），
+**不依赖** `build/native-prelink/*-candidate.macho`，所以不存在第二段里的 bootstrap 循环。
+
+需要说明的是：这是静态闭环，不是链接验证；真正的验证要等 macOS 上跑一次 `mode=full, config=console`。
+
 ## 4. 因此建议的推进方式
 
 1. 先跑通 `uefi` 模式（有现成镜像，见 README）。
