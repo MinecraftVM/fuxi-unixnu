@@ -16,6 +16,7 @@ out="$ROOT/out/boot-fuxi.img"
 python=${PYTHON:-python3}
 gzip_ramdisk=0
 payload_after_dtb=0
+built_firmware=0
 payload_size=0
 
 usage() {
@@ -83,11 +84,18 @@ payload="$unixnu/out/fuxi/payload/payload.img"
 if [ -z "$fd" ]; then
   fd="$uefi/Build/fuxiPkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd"
 fi
+built_firmware=0
 if [ ! -f "$fd" ]; then
+  built_firmware=1
   echo "== firmware (no firmware volume yet)"
+  # The payload discovery chain must be in the firmware, not only in the payload.
+  "$python" "$ROOT/fuxi-unixnu/scripts/apply-fixes.py" --uefi "$uefi" --device "$device" --discover
   (cd "$unixnu" && "$python" ./unixnu build firmware -D "$device" --uefi "$uefi")
 fi
 [ -f "$fd" ] || { echo "firmware volume not found: $fd" >&2; exit 1; }
+if [ "$built_firmware" = 0 ]; then
+  echo "note: using the existing firmware volume; rebuild it after --discover if the payload is not found"
+fi
 
 echo "== boot image"
 pack_args=(--uefi "$uefi" --fd "$fd" --dtb "$uefi/Resources/DTBs/fuxi.dtb"
