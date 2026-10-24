@@ -4,6 +4,7 @@
 > - 固件 + UniXNU 界面已在小米 13 真机上跑通（菜单可见）；
 > - payload 卷发现待真机确认：先试 `out/flash-kit/boot-uefi-hello-dt.img`；
 > - XNU（iOS）内核只差一次 macOS Actions 构建：`mode=kernel, config=console`；
+>   **第一次构建必须选 `config=console`**（`upstream` 需要预先存在的 prelink 闭包，全新 checkout 一定会失败）；
 > - 其余环节（补丁、DriverKit 头、ADT、payload 组装、IPSW pin）都已在 Linux 上实测。
 
 把 [UniXNU](https://github.com/UniXNU/UniXNU)（在非 Apple ARM64 硬件上通过 UEFI 跑 Darwin/XNU）

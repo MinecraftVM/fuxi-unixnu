@@ -121,6 +121,9 @@ def main() -> int:
     if problems:
         for problem in problems:
             print(f"  error: {problem}", file=sys.stderr)
+        if enabled(values, "BOOT_PROGRESS"):
+            print("  hint: a fresh build cannot enable BOOT_PROGRESS; use config=console "
+                  "(source-only archives) or seed the prelink closure first", file=sys.stderr)
         return 1
     print("  defconfig is consistent with the XNU build script guards")
     return 0

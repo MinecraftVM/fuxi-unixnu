@@ -45,6 +45,7 @@ FUXIRAMDISK: no volume; hob=1 base=0x…C4C2914   ← SEC 提示在低内存，�
 | prelink 的 31 个 root kext | ✅ Linux 实测 | 都在 kernelcache 的字符串里 |
 | **XNU 编译/链接** | ⏳ **只剩 macOS** | workflow `mode=full, config=console` |
 | CI 预检（配置 + IPSW pin） | ✅ 本机按 CI 路径实测 | 预检失败不消耗 macOS 分钟 |
+| CI 首次真机运行 | ⚠️ config=upstream 触发 BOOT_PROGRESS 守卫 | 默认已改为 console，预检会先拦 |
 | trust cache bundle | ⏳ 需要设备输入 | `static-trustcache.bin` |
 
 ## 4. 镜像清单

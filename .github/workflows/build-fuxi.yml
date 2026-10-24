@@ -24,10 +24,10 @@ on:
         required: false
         default: ""
       config:
-        description: "upstream = the repository as checked in; console = experimental source-only archives"
+        description: "console = source-only archives (a fresh build must use this); upstream needs a pre-seeded prelink closure"
         type: choice
-        options: [upstream, console]
-        default: upstream
+        options: [console, upstream]
+        default: console
       chip_id:
         description: "platform seed (16 hex digits, e.g. 0123456789abcdef); required by mode=full"
         required: false

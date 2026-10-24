@@ -168,3 +168,30 @@ CONFIG 为 0 而跳过。
   - ADT 工具要求 `--unique-chip-id` 与 `--chip-id` 同时给，board.toml 两者都有
     （`chip_id="207"` 按十六进制解析 = 0x207，和 DTB 的 `qcom,msm-id` 一致）；
   - `ipad_identity = true` 会传 `--ipad-identity`，ADT 里才用 iPad 身份而不是 sheng 的。
+
+## 8. 第一次 CI 运行会看到的两条日志
+
+### 8.1 `_native_legacy_display_probe` 未定义（bootstrap pass）
+
+```
+Undefined symbols for architecture arm64:
+  "_native_legacy_display_probe", referenced from:
+      _bsd_init in bsd_init.o
+```
+
+**这是预期的**。bootstrap pass 只要求留下 `*.o.json` 编译记录和 `link.filelist`，不链接任何归档；
+而 `bsd_init` 无条件引用 `native_legacy_display_probe()`，所以链接必然失败。驱动检测到记录已经生成后
+会继续，随后 `build-legacy-stub.py` 产出 `libLegacyStub.a`，第二次（非 bootstrap）链接通过
+`CONFIG_XNU_EXTRA_LD_ARCHIVES` 把它带进来。
+
+### 8.2 `Boot progress requires ...`
+
+```
+Boot progress requires the audited UFS/owner-root, Virtio and source-crypto build
+```
+
+说明用了 **`config=upstream`**：`fuxi_defconfig` 打开了 `CONFIG_XNU_BOOT_PROGRESS`，但 UFS/owner-root/VirtIO
+没有开（它们依赖 prelink 候选）。全新构建必须用 **`config=console`**。
+
+工作流的 `config` 默认值已改为 `console`，Ubuntu 预检里的 `check-defconfig.py` 也会在 macOS 之前
+直接报出这个组合。
