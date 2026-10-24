@@ -20,6 +20,25 @@ import sys
 from pathlib import Path
 
 RULES = [
+    ("boot progress guard",
+     re.compile(r"Boot progress requires the audited"),
+     "config=upstream turns BOOT_PROGRESS on without its UFS/owner-root/VirtIO/source-crypto "
+     "dependencies. Use config=console for a fresh build (check with scripts/check-defconfig.py)."),
+    ("legacy display probes",
+     re.compile(r"Undefined symbols[^\n]*_native_legacy_display_probe|_native_legacy_display_probe[^\n]*referenced"),
+     "Expected in the bootstrap pass, which links without archives. If the final link fails, "
+     "CONFIG_XNU_EXTRA_LD_ARCHIVES must name build/legacy-stub/libLegacyStub.a and [kernel] "
+     "archives must include build-legacy-stub.py."),
+    ("XNU reference revision",
+     re.compile(r"unexpected XNU reference revision"),
+     "feeds.toml pins an xnu commit that the checkout does not have; restore the pin or refetch."),
+    ("kernelcache pin",
+     re.compile(r"does not match the kernelcache this board was qualified against|kernelcache of this IPSW does not match"),
+     "The IPSW or board.toml kernelcache_sha256 is wrong; scripts/verify-ipsw.py checks it without macOS."),
+    ("compile records missing",
+     re.compile(r"No such file or directory: [^\n]*\.o\.json"),
+     "An archive builder ran without the bootstrap pass compile records; run 'unixnu build kernel' "
+     "from a clean output directory so the bootstrap pass runs first."),
     ("missing static archive",
      re.compile(r"(ld|clang).*(library|file) not found|cannot find -l|ld: .*\.a' not found"),
      "The link wants an archive that no step built. The stage-2a defconfig does not set "
