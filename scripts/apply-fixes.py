@@ -155,11 +155,16 @@ def set_archives(text: str, entries: list[str]) -> str:
 
 
 def enable_probe(uefi: Path) -> None:
-    """Compile FuxiProbeDxe into the firmware volume (a separate, diagnostic image).
+    """Compile FuxiProbeDxe into the firmware volume and make it visible without ConOut.
 
     The driver is in the upstream tree but not referenced by fuxi.dsc/fuxi.fdf. It
     clears the screen, prints the FUXIESP memory-map search result and halts, which
     is the only on-screen diagnostic this board has without a UART.
+
+    Its Print() calls need ConOut (GOP + GraphicsConsole). The platform's SerialPortLib
+    is FrameBufferSerialPortLib, so DEBUG output reaches the same panel through the
+    "Display Reserved" region alone. A few DEBUG lines are injected around the Print
+    calls so the probe still reports entry, hit count and halt when ConOut is broken.
     """
     package = uefi / "Platforms/Xiaomi/fuxiPkg"
     dsc, fdf = package / "fuxi.dsc", package / "fuxi.fdf"
@@ -186,6 +191,114 @@ def enable_probe(uefi: Path) -> None:
                  f"  INF {PROBE_INF}\n\n")
         write_text(fdf, text.replace(anchor, block + anchor), crlf)
         print(f"{fdf}: probe added to FvMain")
+
+    inf = package / "Drivers/FuxiProbeDxe/FuxiProbeDxe.inf"
+    text, crlf = read_text(inf)
+    changed = False
+    if "DebugLib" not in text:
+        anchor = "[LibraryClasses]\n"
+        if anchor not in text:
+            raise SystemExit(f"{inf}: no [LibraryClasses] section")
+        text = text.replace(anchor, anchor + "  DebugLib\n", 1)
+        changed = True
+        print(f"{inf}: DebugLib added")
+    if "gEfiGraphicsOutputProtocolGuid" not in text:
+        text = text.replace("\\r\\n", "\\n")
+        text = text.rstrip("\n") + "\n\n[Protocols]\n  gEfiGraphicsOutputProtocolGuid\n"
+        changed = True
+        print(f"{inf}: GraphicsOutput protocol added")
+    if changed:
+        write_text(inf, text, crlf)
+    else:
+        print(f"{inf}: already patched")
+
+    source = package / "Drivers/FuxiProbeDxe/FuxiProbeDxe.c"
+    text, crlf = read_text(source)
+    if "FUXIPROBE: entry" in text:
+        print(f"{source}: DEBUG lines already present")
+        return
+    if "#include <Library/DebugLib.h>" not in text:
+        text = text.replace("#include <Uefi.h>\n",
+                            "#include <Uefi.h>\n#include <Library/DebugLib.h>\n#include <Protocol/GraphicsOutput.h>\n", 1)
+    replacements = [
+        ("  gBS->Stall (4000000);",
+         '  DEBUG ((DEBUG_ERROR, "FUXIPROBE: entry (framebuffer debug)\\n"));\n'
+         '  {\n'
+         '    EFI_GRAPHICS_OUTPUT_PROTOCOL  *Gop = NULL;\n'
+         '    EFI_STATUS                    GopStatus;\n'
+         '    GopStatus = gBS->LocateProtocol (&gEfiGraphicsOutputProtocolGuid, NULL, (VOID **)&Gop);\n'
+         '    DEBUG ((DEBUG_ERROR, "FUXIPROBE: GOP %r\\n", GopStatus));\n'
+         '    if (!EFI_ERROR (GopStatus) && (Gop->Mode != NULL)) {\n'
+         '      DEBUG ((DEBUG_ERROR, "FUXIPROBE: GOP fb %lx %ux%u stride %u\\n",\n'
+         '              (UINT64)Gop->Mode->FrameBufferBase, Gop->Mode->Info->HorizontalResolution,\n'
+         '              Gop->Mode->Info->VerticalResolution, Gop->Mode->Info->PixelsPerScanLine));\n'
+         '    }\n'
+         '  }\n'
+         '  gBS->Stall (4000000);'),
+        ("  if (Hits == 0) {",
+         '  DEBUG ((DEBUG_ERROR, "FUXIPROBE: %lu hits in %lu regions\\n", (UINT64)Hits, (UINT64)Count));\n  if (Hits == 0) {'),
+        ("  CpuDeadLoop ();",
+         '  DEBUG ((DEBUG_ERROR, "FUXIPROBE: halted for observation\\n"));\n  CpuDeadLoop ();'),
+    ]
+    for needle, replacement in replacements:
+        if needle not in text:
+            raise SystemExit(f"{source}: anchor not found: {needle!r}")
+        text = text.replace(needle, replacement, 1)
+    write_text(source, text, crlf)
+    print(f"{source}: DEBUG lines injected")
+
+
+def enable_ramdisk_debug(uefi: Path) -> None:
+    """Make FuxiRamDiskDxe visible on the framebuffer console and stop it halting the boot.
+
+    The driver reports through Print(), i.e. ConOut. On this board ConOut depends on
+    the GOP that SimpleFbDxe publishes, while DEBUG goes straight to the "Display
+    Reserved" framebuffer through FrameBufferSerialPortLib. When the payload volume is
+    not found the driver also ends in CpuDeadLoop(), which looks exactly like a hang
+    at "Loading driver ... FuxiRamDiskDxe.efi".
+
+    This patch adds DEBUG lines for the HOB hint, the search result and the volume
+    address, and turns the dead loop into an error return so the boot continues to
+    BdsDxe and UniXNU (whose own logs are DEBUG too).
+    """
+    package = uefi / "Platforms/Xiaomi/fuxiPkg"
+    source = package / "Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.c"
+    inf = package / "Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.inf"
+    text, crlf = read_text(source)
+    if "FUXIRAMDISK: entry (debug path)" in text:
+        print(f"{source}: already patched")
+        return
+    if "#include <Library/DebugLib.h>" not in text:
+        text = text.replace("#include <Uefi.h>\n", "#include <Uefi.h>\n#include <Library/DebugLib.h>\n", 1)
+    replacements = [
+        ("  gBS->Stall (3000000);",
+         '  DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: entry (debug path)\\n"));\n  gBS->Stall (3000000);'),
+        (r'    Print (L"SIGNAL: no volume from the hint\n");',
+         '    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: no volume; hob=%d base=%lx\\n", mHintSeen ? 1 : 0, mHintValue));\n'
+         r'    Print (L"SIGNAL: no volume from the hint\n");'),
+        ("    CpuDeadLoop ();",
+         '    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: returning NOT_FOUND instead of halting\\n"));\n'
+         "    return EFI_NOT_FOUND;"),
+        (r'  Print (L"SIGNAL: summary\n");',
+         '  DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx, %lu bytes\\n", (UINT64)(UINTN)mVolumeBase, (UINT64)mVolumeBytes));\n'
+         r'  Print (L"SIGNAL: summary\n");'),
+    ]
+    for needle, replacement in replacements:
+        if needle not in text:
+            raise SystemExit(f"{source}: anchor not found: {needle!r}")
+        text = text.replace(needle, replacement, 1)
+    write_text(source, text, crlf)
+    print(f"{source}: DEBUG lines added, dead loop removed")
+
+    inf_text, inf_crlf = read_text(inf)
+    if "DebugLib" not in inf_text:
+        anchor = "[LibraryClasses]\n"
+        if anchor not in inf_text:
+            raise SystemExit(f"{inf}: no [LibraryClasses] section")
+        write_text(inf, inf_text.replace(anchor, anchor + "  DebugLib\n", 1), inf_crlf)
+        print(f"{inf}: DebugLib added")
+    else:
+        print(f"{inf}: DebugLib already present")
 
 
 def enable_debug_conout(uefi: Path) -> None:
@@ -257,6 +370,8 @@ def main() -> int:
                         help="compile the FuxiProbeDxe bring-up diagnostic into the firmware volume")
     parser.add_argument("--debug-conout", action="store_true",
                         help="route EDK II DEBUG output to ConOut so the screen shows the boot log")
+    parser.add_argument("--ramdisk-debug", action="store_true",
+                        help="make FuxiRamDiskDxe log through DEBUG and stop it halting the boot")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -289,6 +404,8 @@ def main() -> int:
         enable_probe(Path(args.uefi))
     if args.debug_conout:
         enable_debug_conout(Path(args.uefi))
+    if args.ramdisk_debug:
+        enable_ramdisk_debug(Path(args.uefi))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)

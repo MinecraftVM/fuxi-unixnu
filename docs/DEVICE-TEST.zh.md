@@ -83,15 +83,19 @@ FAT 卷在内存里的位置；最后故意 `CpuDeadLoop()` 停住。
 
 本地产物：`out/boot-uefi-debugcon.img`（1.84 MB）。
 
-默认固件的 DEBUG 走 `BaseDebugLibSerialPort`（串口），而小米 13 没有可接触的 UART，
-所以像
+先说清楚这台机器上日志是怎么出来的：平台的 `SerialPortLib` 不是真串口，而是
+`SiliciumPkg/Library/FrameBufferSerialPortLib` —— 它按内存映射里的 **"Display Reserved"**
+（`0xB8000000`，43 MiB）直接把 `DEBUG(...)` 的字符写进帧缓冲。
+所以 **DEBUG 日志本来就在屏幕上**，不需要 UART。
 
-```
-PrepareRfsProtection: Failed to Locate SCM Protocol! Status = Not Found
-```
+这也解释了一个关键区别：
 
-这类日志正常是看不到的。这一版把 **DXE 阶段的 DEBUG 改到 ConOut**，日志会打到屏幕上，
-能直接看出固件停在哪个模块。
+| 输出方式 | 走哪条路 | 屏幕可见？ |
+| --- | --- | --- |
+| `DEBUG (...)` | FrameBufferSerialPortLib → 帧缓冲 | ✅ 只要该区域可写 |
+| `Print (...)` / UniXNU 菜单 | ConOut → SimpleFbDxe 的 GOP → GraphicsConsole | ❌ 如果 GOP 没起来就看不到 |
+
+`out/boot-uefi-debugcon.img` 把 DXE 的 DebugLib 换成 ConOut 版本，是备用手段（一般不需要）。
 
 注意：
 
@@ -102,6 +106,39 @@ PrepareRfsProtection: Failed to Locate SCM Protocol! Status = Not Found
 - 如果屏幕上一行日志都没有，说明 ConOut/GOP 还没起来，问题在显示路径而不是后面的模块。
 
 复现：`apply-fixes.py --debug-conout` 后重新编固件，见 [BUILD-LOCAL.zh.md](BUILD-LOCAL.zh.md)。
+
+## 1e. 卡在 `FuxiRamDiskDxe.efi` 时用这个镜像
+
+现象（实测反馈）：屏幕最后一行是
+
+```
+Loading driver at 0x00006680000 EntryPoint=0x000C6681050 FuxiRamDiskDxe.efi
+```
+
+原因有三层：
+
+1. 这行是 DXE dispatcher 的 `DEBUG`，所以能看见；
+2. `FuxiRamDiskDxe` 自己的报告用 `Print()`，要 ConOut；GOP 没起来时全部不可见；
+3. 它找不到 FAT 卷（标号 `FUXIESP`）时会执行 `CpuDeadLoop()`——看起来就是“卡死”，
+   实际是上游故意停在这里。
+
+本地产物：`out/boot-uefi-diskdbg.img`（1.84 MB）。它把这个驱动改成：
+
+- 关键点用 `DEBUG` 报告（屏幕直接可见）：entry、HOB 提示地址、搜索结果、是否返回；
+- 找不到卷时 **不再死循环**，返回错误让 BdsDxe / UniXNU 继续跑（UniXNU 的日志也是 DEBUG）。
+
+预期看到（顺序）：
+
+```
+FUXIRAMDISK: entry (debug path)
+FUXIRAMDISK: no volume; hob=1 base=0x...      ← 或者 FUXIRAMDISK: payload at 0x...
+FUXIRAMDISK: returning NOT_FOUND instead of halting
+PrepareRfsProtection: ...
+UNIXNU: ...
+```
+
+`payload at 0x...` 表示卷找到了；`no volume` 表示 SEC 的 HOB 提示没有命中，
+接下来就要看 `base=` 的值和 BootShim 传参。
 
 ## 2. 测试 B：full 镜像（带 XNU）
 
