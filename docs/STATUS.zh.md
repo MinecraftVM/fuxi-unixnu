@@ -1,85 +1,86 @@
-# fuxi 移植现状与路线图
+# fuxi 移植现状（2026-10-24）
 
-写这份文档时（2026-10-24），fuxi 的 UniXNU 移植由两棵上游仓库支撑，都还在 bring-up 阶段。
-本仓库的定位是：**把已有成果固定下来、修掉会直接卡住启动的配置、用可复现的方式产出 boot.img，
-并把还缺什么写清楚**。
+一句话：**固件和 UniXNU 界面已经在小米 13 上跑起来了**；payload 卷的发现正在收敛；
+XNU 内核只剩 macOS 编译这一步，其余环节都已在 Linux 上验证过。
 
-## 1. 三个部分
+## 1. 真机已经到哪一步
 
-| 部分 | 仓库 | 作用 |
+| 阶段 | 状态 | 证据 |
 | --- | --- | --- |
-| 构建驱动 / 通用驱动 / kits | [UniXNU/UniXNU](https://github.com/UniXNU/UniXNU) | `./unixnu` 子命令：取源码、组树、编内核、编固件、做 payload/bootimg |
-| 设备仓库 | [hanzi123-bilp/unixnu-fuxi](https://github.com/hanzi123-bilp/unixnu-fuxi) | `board.toml`、`fuxi_defconfig`、ADT 生成器、stub、链接脚本 |
-| UEFI 固件 | [hanzi123-bilp/uefi-fuxi](https://github.com/hanzi123-bilp/uefi-fuxi)（`fuxi` 分支） | Mu-Silicium 的 fuxi 移植：`fuxiPkg`、`Resources/Configs/fuxi.toml`、`Resources/DTBs/fuxi.dtb`、v3 打包器 |
+| ABL 接受 v3 boot.img | ✅ | `fastboot boot` 正常 |
+| BootShim → UEFI 固件 | ✅ | 屏幕出现 DXE dispatcher 日志 |
+| DEBUG 上屏（FrameBufferSerialPortLib） | ✅ | `SEC: ...`、`Loading driver ...` 等 |
+| DXE 驱动枚举 | ✅ | 55 个内存描述符、FuxiKeyInputDxe/Smbios/UniXNUDxe 依次加载 |
+| UniXNU 应用程序 | ✅ | 菜单显示，含 Restart / Power off |
+| payload 卷发现 | ⏳ | 旧扫描窗口没命中；新镜像用 `/chosen initrd` + Kernel 窗口 |
+| XNU 内核 | ⏳ | 需要 macOS 编译 |
 
-上游 UniXNU 还提供 DarwinBoot、NativePrelink、4 KiB XNU 补丁、ArmCpu/ArmDTPlatform 等通用组件。
+## 2. 真机内存布局（从屏幕日志读到）
 
-## 2. 从 fuxi 自己的 DTB 解出来的硬件事实
+```
+FUXIDT: entry x0=0x…（合法 FDT，/chosen 有 linux,initrd-start/end，len=8）
+FUXIMAP: A8000000 256 MiB type 0   ← 平台 Kernel 窗口（payload 最可能在这里）
+FUXIMAP: BAB00000 186 MiB type 7   ← DXE heap
+FUXIMAP: 89800000 402 MiB type 0
+FUXIMAP: D8800000 138 MiB type 0
+FUXIRAMDISK: no volume; hob=1 base=0x…C4C2914   ← SEC 提示在低内存，扫描方向/窗口不对
+```
 
-`uefi/Resources/DTBs/fuxi.dtb` 是这台机器的原厂设备树（qualcomm kalama-mtp）。以下由本仓库
-直接解码确认，不是从 sheng 抄的：
+结论：**用 `/chosen` 的 initrd 地址，或直接扫 `0xA8000000` 那 256 MiB**。
+`boot-uefi-hello-full.img` 就是这么做的（还带 ±4 MiB 容错）。
 
-| 项 | 值 | 用途 |
+## 3. 完整链路与验证状态
+
+| 环节 | 状态 | 备注 |
 | --- | --- | --- |
-| SoC | `qcom,kalama-mtp` / `qcom,kalama`，`qcom,msm-id` 含 `0x207` | 对应 `board.toml` 的 `adt.chip_id = "207"` |
-| 面板 | `qcom,mdss_dsi_m3_38_0c_0a_dsc_cmd`，1080×2400，DSC command mode | `fuxi.dsc` 的 `PcdFrameBufferWidth/Height = 1080/2400` |
-| 触控 | **Goodix GT9916**（`goodix-berlin@5d`，I2C `i2c@a90000`） | **和 sheng 的 Novatek NT36532E 完全不同**，需要新驱动 |
-| 触控坐标 | `panel-max-x = 0x438`（1080）、`panel-max-y = 0x960`（2400） | 驱动上报量程 |
-| splash | `/reserved-memory/splash_region` = `0xb8000000`, `0x2b00000` | ABL 留在屏幕上的 framebuffer，UEFI GOP 直接接在上面 |
-| DRAM | `/memory` 基址 `0x80000000`，`ddr_size = 0xc` | 12 GB 机型；ADT 的 `owned_memory_size` 需要按实际改 |
-| 系统版本 | `swinfo.fingerprint=fuxi:13/OS3.0.308.0.WMCCNXM:user` | 读 GPT/分区时确认机型 |
+| UEFI 固件（Mu-Silicium fuxiPkg） | ✅ 真机 | 上游 `c15fe352` 起自带 reporting ramdisk 驱动 |
+| boot.img v3 打包（BootShim+gzip+DTB+ramdisk） | ✅ 本地实测 | `pack-bootimg-v3.py`，逐段回读 |
+| UniXNU.efi + 菜单 + payload 加载 | ✅ QEMU + 真机 | QEMU 里跑过真实 FAT 镜像 |
+| payload 卷发现 | ⏳ 真机待确认 | 新镜像带 `/chosen` + Kernel 窗口扫描 |
+| ADT 生成 | ✅ Linux 实测 | 13,496 字节，节点/身份值核对 |
+| payload 组装（ADT+FAT+config） | ✅ Linux 实测 | 用真实 kernelcache 跑通（panic 补丁除外） |
+| XNU 源码 + 58 个补丁 | ✅ Linux 实测 | 67 文件，+2454/−92 |
+| DriverKit 头恢复 | ✅ Linux 实测 | 26 个头，blob 哈希校验 |
+| IPSW 身份 + kernelcache pin | ✅ Linux 实测 | `f18b4df…` 与 board.toml 一致 |
+| **XNU 编译/链接** | ⏳ **只剩 macOS** | workflow `mode=full, config=console` |
+| trust cache bundle | ⏳ 需要设备输入 | `static-trustcache.bin` |
 
-## 3. 上游已经做到哪一步
+## 4. 镜像清单
 
-### UEFI（uefi-fuxi，`fuxi` 分支）
+| 镜像 | 用途 |
+| --- | --- |
+| `boot-uefi-only.img` | 最早期固件（会卡在旧 ramdisk 驱动的死循环） |
+| `boot-uefi-diskdbg.img` | 不 halt 的固件，已验证能进 UniXNU 界面 |
+| `boot-uefi-diskup.img` | 同上 + 向上 16 MiB 扫描 |
+| `boot-uefi-debugcon.img` | DebugLib 改走 ConOut（一般不需要，DEBUG 本来就上屏） |
+| `boot-uefi-probe.img` | FUXIPROBE 驱动：GOP 状态 + 内存扫描后停机 |
+| `boot-uefi-diag.img` | hello payload + FUXIRAMDISK/FUXIDT/FUXIMAP 三组日志 |
+| `boot-uefi-hello-down/up/new.img` | 带 hello payload 的三种扫描策略 |
+| **`boot-uefi-hello-full.img`** | **/chosen ±4 MiB + Kernel 窗口 + 常规内存** |
 
-- `fuxiPkg` 有 `.dsc/.fdf/DeviceBuild.py`、MemoryMapLib、ConfigurationMapLib、`FuxiRamDiskDxe`、
-  `FuxiKeyInputDxe`、`FuxiBootMemoryDxe`；
-- 最近提交在调 **SEC 阶段传 payload 位置**、扫描 RAM 找 FAT 卷、BootShim 保留 x1 等，
-  说明固件已经能在真机上跑到“找 payload/找 DTB”这一步；
-- `fuxi.dsc` 里仍有 TODO（CPU stack base 沿用了 sheng/nuwa 的 `0xA760D000`、
-  `FUXI_VENDOR_HW=0` 不加载 vendor 驱动），这些是后续 bring-up 的已知点。
+## 5. 仓库里的工具
 
-### 内核（unixnu-fuxi）
+| 脚本 | 作用 |
+| --- | --- |
+| `apply-fixes.py` | 构建修正（默认删重复 splash；`--console/--probe/--debug-conout/--ramdisk-debug/--ramdisk-scan/--memmap/--dtchosen/--ramdisk-full`） |
+| `pack-bootimg-v3.py` | shim+FD+DTB+payload → v3 boot.img，含 FAT 描述与逐段校验 |
+| `qemu-smoke.sh` | QEMU/AAVMF 上验证 UniXNU + payload（目录 ESP 或真实镜像） |
+| `verify-ipsw.py` | Linux 上核对 IPSW 身份与 kernelcache pin |
+| `gpt-userdata.py` / `blob-scan.py` | 从设备转储读 userdata LBA / 固件窗口 |
+| `diagnose-logs.py` | macOS 构建失败日志归类 |
+| `make-test-payload.py` | 生成 hello payload FAT 卷 |
 
-- 当前是 **stage 2a：console only**：
-  - `fuxi_defconfig` 关掉了 `CONFIG_XNU_NATIVE_UFS`，没有 NativeLegacyDisplay/NativeAdreno；
-  - 用 `scripts/build-legacy-stub.py` + `LegacyDisplayStub.c` 把 legacy display 的符号补上；
-  - 目标是链接通过、进内核入口、用 panic 屏/启动进度给出反馈；
-- `make-fuxi-adt.py` 生成最小 ADT（GICv3、timebase 19.2 MHz、UART/UFS 地址、空 NVRAM proxy）。
+## 6. 下一步
 
-## 4. 还缺什么（按 bring-up 顺序）
+1. 真机确认 `boot-uefi-hello-full.img` 的菜单里出现 **fuxi: UEFI hello (no XNU)**；
+2. 若命中：把 payload 发现逻辑固定进 board/驱动，然后跑 GitHub Actions
+   `mode=full, config=console`，产出的 `boot.img` 里就是真正的 XNU 内核；
+3. 若未命中：把新的 `FUXIRAMDISK:` 行（`chosen initrd-start=` 的值）发回来，按地址改；
+4. 内核能进 panic 屏之后，再考虑显示（GOP 已在 UniXNU 阶段工作）、触控（Goodix GT9916）、存储（UFS/PMGR）。
 
-| # | 目标 | 缺的东西 | 难度 |
-| --- | --- | --- | --- |
-| 1 | UEFI 起来、有画面、进菜单 | 上游正在做：payload 卷定位、GOP 输出、键位 | 上游进行中 |
-| 2 | XNU 到平台专家/控制台 | ADT 校验、memory-map 占位符、panic 屏（本仓库把链路搭好） | 中 |
-| 3 | 显示 | 其实**不需要**写面板驱动：SimpleFbDxe 直接复用 ABL 的 splash framebuffer；再做 NativeLegacyDisplay 就能画 boot progress | 低-中 |
-| 4 | 触控 | **Goodix GT9916** 的 IOKit 驱动：I2C 读、GPIO 中断/复位、goodix 固件包；sheng 的 NativeNovatekTouch 不能直接复用 | 高 |
-| 5 | 存储/UFS | NativeUfs 可复用（同为 SM8550），但要接 PMGR（`sheng-pmgr=2` 那套）、IOStorageFamily prelink 审计 | 高 |
-| 6 | 用户态 | trust cache、Data seed、userdata 镜像（macOS 的 `hdiutil`）、每台机器的 LBA | 中-高 |
+## 7. 已知风险
 
-## 5. 建议的推进顺序
-
-1. **uefi 模式**：先证明固件能在手机上跑起来（本仓库 workflow，inputs: mode=uefi）。
-2. **full 模式**：把 XNU 跑到 panic 屏，拍下 panic 文字——它会直接告诉你缺哪个 provider。
-3. **显示**：确认 SimpleFbDxe 的 GOP 与 XNU 的 framebuffer 交接（`offline-legacy-*` 参数已经在了）。
-4. **触控**：照 `NativeNovatekTouch` 的 IOKit 骨架，写 GT9916 的 I2C 读 + 中断。
-5. **UFS**：把 sheng 的 PMGR/owner-root 链搬过来，先只读挂载。
-6. **userdata**：最后再做，因为会清数据。
-
-## 6. 这一版的未验证项（诚实清单）
-
-- **没有在真机上端到端验证**：写这份文档的环境没有 macOS、也没有连着的手机；
-  内核/载荷/boot.img 的构建逻辑是按上游驱动+官方文档写的，第一次跑 Actions 可能会在
-  内核或 EDK2 步骤报错——日志会随 artifact 上传。
-- 固件卷布局用的是上游 `ad576f83` 之后的 **0xA7100000 / 0x300000**（1 MiB 保留 + 3 MiB FD，
-  和 pipa/nabu/marble 一致）。文件头的旧注释还写着 4 MiB，那是历史遗留，不要照着改。
-- ADT 的 `dram_size = 0x80000000` 和 `owned_memory_size = 0x130000000` 沿用 sheng，
-  fuxi 是 12 GB 机型，后续要按 `/memory` 的实际值调整。
-- `board.toml` 的 `[userdata]` LBA 是 512 GB 版本的；256 GB 版本必须重读 GPT。
-- 触控/显示/存储驱动都不在这一版里，**进不了用户态**是预期行为。
-- full 模式的上游配置在新 checkout 上很可能缺静态库（`fuxi_defconfig` 没有
-  `CONFIG_XNU_BUILD_ARCHIVES`，而链接仍要 `libBootProgress.a`/`libLegacyStub.a`），
-  且 `CONFIG_XNU_NATIVE_AES=y` 需要 prelink 候选。workflow 提供 `config=console`
-  的实验旁路，只从源码归档链接；细节见 [FULL-MODE.zh.md](FULL-MODE.zh.md)。
+- XNU 编译从未在 macOS 上跑过；console 配置的静态闭环已验证，但链接仍可能缺符号；
+- 上游仍在高频推进（`uefi-fuxi` 一天多个提交），跟版本时注意 `apply-fixes` 的兼容处理；
+- trust cache / Data seed 是设备输入，仓库里没有；
+- 真机一切以屏幕为准（没有可接触的 UART）。

@@ -66,6 +66,21 @@ def sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def describe_ramdisk(ramdisk: bytes) -> str:
+    """Say what the payload volume looks like; UniXNU needs the FAT config on it."""
+    if not ramdisk:
+        return "empty"
+    if len(ramdisk) >= 512 and ramdisk[510:512] == b"\x55\xaa":
+        bytes_per_sector = struct.unpack_from("<H", ramdisk, 11)[0]
+        total16 = struct.unpack_from("<H", ramdisk, 19)[0]
+        total32 = struct.unpack_from("<I", ramdisk, 32)[0]
+        sectors = total16 or total32
+        label = ramdisk[0x47:0x52].split(b"\0")[0].decode("latin1", "replace").rstrip()
+        return (f"FAT label={label!r} bytes_per_sector={bytes_per_sector} "
+                f"sectors={sectors} image_bytes={len(ramdisk)}")
+    return f"not a FAT volume ({len(ramdisk)} bytes)"
+
+
 def uefi_config(uefi, name):
     path = Path(uefi) / "Resources" / "Configs" / f"{name}.toml"
     if not path.is_file():
@@ -168,6 +183,9 @@ def main():
     if dtb[:4] != FDT_MAGIC or struct.unpack_from(">I", dtb, 4)[0] != len(dtb):
         raise PackError(f"{args.dtb} is not a complete flattened device tree")
     ramdisk = Path(args.ramdisk).read_bytes() if args.ramdisk else b""
+    ramdisk_kind = describe_ramdisk(ramdisk)
+    if ramdisk and not ramdisk_kind.startswith("FAT"):
+        print(f"warning: the ramdisk is {ramdisk_kind}; UniXNU expects its FAT payload volume here")
 
     with tempfile.TemporaryDirectory(prefix="fuxi-bootimg-") as scratch:
         shim = build_shim(uefi, base, size, requires_header, scratch)
@@ -182,6 +200,7 @@ def main():
         "fd_base": hex(base), "fd_size": hex(size), "firmware_bytes": len(firmware),
         "shim_bytes": len(shim), "gzip_bytes": len(gzip_stream), "dtb_bytes": len(dtb),
         "fd_sha256": sha256(firmware), "image_sha256": sha256(Path(args.out).read_bytes()),
+        "ramdisk_kind": ramdisk_kind,
         "config": args.config, "packer": pack_output,
     })
     Path(args.out).with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
@@ -189,7 +208,7 @@ def main():
     print(f"  header v3, kernel at {report['kernel_at']}: gzip {len(gzip_stream)} + dtb {len(dtb)} "
           f"= {report['kernel_size']}")
     print(f"  firmware: {len(firmware):#x} bytes at {base:#x}; shim {len(shim)} bytes")
-    print(f"  ramdisk (payload): {len(ramdisk)} bytes")
+    print(f"  ramdisk (payload): {len(ramdisk)} bytes, {ramdisk_kind}")
     print(pack_output and "\n" + pack_output)
     return 0
 
