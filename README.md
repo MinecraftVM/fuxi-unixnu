@@ -31,6 +31,7 @@
 | Linux 上编出 UniXNU.efi 和 fuxi 固件卷 | ✅ 实测 | `docs/BUILD-LOCAL.zh.md` 第 6 节 |
 | boot.img 结构（v3、BootShim、gzip、DTB、ramdisk） | ✅ 实测 | `boot.json` 逐段回读 |
 | QEMU/AAVMF 上跑 UniXNU 菜单并启动 EFI payload | ✅ 实测 | `docs/BUILD-LOCAL.zh.md` 第 5 节 + 截图 |
+| 真实的 192 MiB payload FAT 镜像能被发现/启动 | ✅ 实测 | `scripts/qemu-smoke.sh --payload-image` |
 | fuxi 真机固件 | ⏳ 待你测 | `boot-uefi-only.img` |
 | macOS 上编 XNU 内核 | ⏳ 待 Actions | workflow `mode=full` |
 

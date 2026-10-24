@@ -147,6 +147,28 @@ UNIXNU-HELLO: Hello from the UniXNU test payload
 SMOKE PASS
 ```
 
+也可以直接验证镜像里的**真实 FAT 卷**（而不是目录 ESP）：加 `--payload-image out/payload-hello.img`，
+脚本会把 192 MiB 的 `payload-hello.img` 作为只读 virtio 磁盘挂上，ESP 里只放 `BOOTAA64.EFI`。
+
+```sh
+$PY fuxi-unixnu/scripts/qemu-smoke.sh --unixnu UniXNU \
+  --efi .../UniXNU.efi --hello .../HelloPayload.efi \
+  --payload-image out/payload-hello.img \
+  --firmware /usr/share/AAVMF/AAVMF_CODE.fd --vars /usr/share/AAVMF/AAVMF_VARS.fd \
+  --log out/qemu-image.log --png out/qemu-image.png
+```
+
+日志里 `config: loaded \EFI\UniXNU\unixnu.toml` 后面是 3 个条目、`default 0 'hello'`，
+说明 UniXNU 是在**我们做的那张 FAT 镜像**上找到配置并启动 payload 的：
+
+```
+UNIXNU: config: loaded \EFI\UniXNU\unixnu.toml
+UNIXNU: menu: shown 3 entries, default 0 'hello', timeout 5000 ms
+UNIXNU: boot: entry 'hello' (fuxi: UEFI hello (no XNU))
+UNIXNU-HELLO: Hello from the UniXNU test payload
+SMOKE PASS
+```
+
 ![QEMU 中的 UniXNU 菜单](images/qemu-menu.png)
 
 这证明：Linux 上编出的 `UniXNU.efi` 可执行、FAT 卷布局和 `unixnu.toml` 解析正确、
