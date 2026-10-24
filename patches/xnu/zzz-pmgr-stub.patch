@@ -8,7 +8,7 @@
  
  extern "C" {
  #include <libkern/amfi/amfi.h>
-@@ -110,6 +111,33 @@
+@@ -110,6 +111,34 @@
  kern_return_t
  IOKitBSDInit( void )
  {
@@ -19,7 +19,7 @@
 +	{
 +		int sheng_pmgr_stub = 0;
 +		if (PE_parse_boot_argn("sheng-pmgr-stub", &sheng_pmgr_stub, sizeof(sheng_pmgr_stub)) && sheng_pmgr_stub) {
-+			OSMetaClass *meta = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("ApplePMGRNub"));
++			const OSMetaClass *meta = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("ApplePMGRNub"));
 +			if (meta == nullptr) {
 +				IOLog("sheng-pmgr-stub: ApplePMGRNub class missing\n");
 +			} else {
@@ -27,7 +27,8 @@
 +				if (nub == nullptr) {
 +					IOLog("sheng-pmgr-stub: alloc failed\n");
 +				} else {
-+					*(void **)((char *)nub + 0x440) = nullptr;
++					uintptr_t slot = (uintptr_t)nub + 0x440;
++					*(void **)slot = nullptr;
 +					if (!nub->init()) {
 +						IOLog("sheng-pmgr-stub: init failed\n");
 +						nub->release();
