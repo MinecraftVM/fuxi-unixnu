@@ -48,7 +48,20 @@ xcode  = 留空
 
 失败时：artifact 里有 `logs/`，或直接看 Action 日志里 “Show the failing kernel log” 的尾部。
 
-### 4.2 真机 payload 发现
+### 4.2 payload：已解决（vendor_boot 通道）
+
+**结论**：`fastboot boot` 的 boot image 不携带 payload；把 payload 替换进 vendor ramdisk 后，
+ABL 会把它加载到 `/chosen` 指向的 initrd，固件的字节级标签扫描命中。
+
+```sh
+python3 scripts/vendor-boot-payload.py replace-ramdisk vendor_boot_b.img payload.img -o vendor_boot_b_xnu.img
+fastboot flash vendor_boot_b vendor_boot_b_xnu.img
+fastboot boot <firmware-only boot.img>
+```
+
+恢复：`fastboot flash vendor_boot_b <官方镜像>`。真机已验证 hello payload 出现在 UniXNU 菜单。
+
+### 4.2b 早期诊断记录
 
 **已定位的机制**（2026-10-24 真机日志）：
 

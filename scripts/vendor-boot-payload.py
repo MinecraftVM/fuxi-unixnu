@@ -76,6 +76,10 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     a = sub.add_parser("analyze", help="print the header and the ramdisk format")
     a.add_argument("image")
+    r = sub.add_parser("replace-ramdisk", help="replace the vendor ramdisk with the payload")
+    r.add_argument("image")
+    r.add_argument("payload")
+    r.add_argument("-o", "--out", required=True)
     b = sub.add_parser("add-payload", help="append the payload to the vendor ramdisk and rebuild")
     b.add_argument("image")
     b.add_argument("payload")
@@ -93,7 +97,10 @@ def main() -> int:
         return 0
 
     payload = Path(args.payload).read_bytes()
-    ramdisk = parts["ramdisk"] + payload
+    if args.command == "replace-ramdisk":
+        ramdisk = payload
+    else:
+        ramdisk = parts["ramdisk"] + payload
     table = bytearray(parts["table"])
     if len(table) >= 12:
         # The table tells the bootloader which ramdisk ranges to load; extend entry 0

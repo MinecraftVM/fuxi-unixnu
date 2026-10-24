@@ -587,3 +587,35 @@ LOWMEM: try 00000000005059d4      ← 停在这里
 1. **在固件里映射低内存**：给 `MemoryPeim`/`PlatformPeiLib` 增加 0x0..0x1000000 的
    Reserved 区域，让 CPU 驱动建立映射，再读 ABL 的 boot buffer。实验性强，可能影响启动稳定性；
 2. **改 vendor_boot**（工具已就绪，需要官方镜像与刷写授权）。
+## 1r. 突破：payload 通过 vendor_boot 进入固件（2026-10-24）
+
+```
+FUXIRAMDISK: payload at ... (label at +0)
+菜单: fuxi: UEFI hello (no XNU)
+```
+
+做法：
+
+1. `vendor-boot-payload.py replace-ramdisk` 把 64 MiB 的 payload FAT 整体替换 vendor ramdisk；
+2. table 条目 0 改为 64 MiB / offset 0（ABL 按表加载整个 ramdisk）；
+3. `fastboot flash vendor_boot_b out/vendor_boot_b_payload64.img`；
+4. `fastboot boot out/boot-uefi-hello-noram.img`（固件不需要自带 ramdisk）。
+
+关键点：`/chosen` 的 initrd 大小正好等于替换后的 ramdisk；固件的字节级标签扫描在 initrd 起点找到 FAT。
+
+**恢复**：`fastboot flash vendor_boot_b out/vendor_boot_b.img`。
+
+## 1s. 真实 XNU payload 的组装
+
+拿到 `kernel.macho` 后：
+
+```sh
+# 1) payload（64 MiB，内核 + ADT + panic 屏）
+bash fuxi-unixnu/scripts/assemble-full.sh --kernel kernel.macho --chip-id <hex> --payload-size 64
+# 2) 替换 vendor ramdisk
+python3 fuxi-unixnu/scripts/vendor-boot-payload.py replace-ramdisk \
+  out/vendor_boot_b.img UniXNU/out/fuxi/payload/payload.img -o out/vendor_boot_b_xnu.img
+# 3) 刷入并启动固件（boot.img 可以只带固件，不带宽 ramdisk）
+fastboot flash vendor_boot_b out/vendor_boot_b_xnu.img
+fastboot boot <firmware-only boot.img>
+```
