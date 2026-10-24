@@ -15,6 +15,8 @@ bash fuxi-unixnu/scripts/assemble-full.sh --kernel /path/to/kernel.macho --chip-
 
 如果真机测试表明 ABL 只解压**压缩的 ramdisk**，加 `--gzip-ramdisk`（64 MiB 的 FAT 会压到 ~77 KB）；
 如果有大小上限，加 `--payload-size 64`（会顺手把 `[payload] size_mib` 改成 64）。
+如果 ABL 只拷贝压缩 ramdisk，加 `--lz4-ramdisk`（需要 `lz4`，用 legacy frame `lz4 -l`，
+固件里的解码器会自己解压）。
 
 下面是拆开的分步命令。
 

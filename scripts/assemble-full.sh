@@ -15,6 +15,7 @@ fd=""
 out="$ROOT/out/boot-fuxi.img"
 python=${PYTHON:-python3}
 gzip_ramdisk=0
+lz4_ramdisk=0
 payload_after_dtb=0
 built_firmware=0
 payload_size=0
@@ -46,6 +47,7 @@ while [ $# -gt 0 ]; do
     --payload-size) payload_size=$2; shift 2 ;;
     --gzip-ramdisk) gzip_ramdisk=1; shift ;;
     --payload-after-dtb) payload_after_dtb=1; shift ;;
+    --lz4-ramdisk) lz4_ramdisk=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -98,8 +100,14 @@ if [ "$built_firmware" = 0 ]; then
 fi
 
 echo "== boot image"
+ramdisk_arg="$payload"
+if [ "$lz4_ramdisk" = 1 ]; then
+  command -v lz4 >/dev/null || { echo "lz4 is not on PATH (needed by --lz4-ramdisk)" >&2; exit 1; }
+  lz4 -l -9 -f "$payload" "$payload.lz4"
+  ramdisk_arg="$payload.lz4"
+fi
 pack_args=(--uefi "$uefi" --fd "$fd" --dtb "$uefi/Resources/DTBs/fuxi.dtb"
-           --ramdisk "$payload" --out "$out")
+           --ramdisk "$ramdisk_arg" --out "$out")
 if [ "$gzip_ramdisk" = 1 ]; then pack_args+=(--gzip-ramdisk); fi
 if [ "$payload_after_dtb" = 1 ]; then pack_args+=(--payload-after-dtb); fi
 "$python" "$ROOT/fuxi-unixnu/scripts/pack-bootimg-v3.py" "${pack_args[@]}"
