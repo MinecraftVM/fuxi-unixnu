@@ -5,5 +5,7 @@
                     mVolumeBase  = Lz4Base;
                     mVolumeBytes = Lz4Bytes;
                     DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx (lz4 decompressed)\n", (UINT64)(UINTN)Lz4Base));
+                  } else {
+                    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: no lz4 frame in the initrd range\n"));
                   }
                 }
