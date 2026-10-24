@@ -19,6 +19,10 @@ on:
         type: choice
         options: [full, kernel, uefi]
         default: full
+      xcode:
+        description: "Xcode version under /Applications (empty = the runner default)"
+        required: false
+        default: ""
       config:
         description: "upstream = the repository as checked in; console = experimental source-only archives"
         type: choice
@@ -205,7 +209,14 @@ jobs:
           # Xcode's clang and ld64. The driver finds the keg-only LLVM through
           # its own tool search, and self/scripts/pack-bootimg-v3.py looks in
           # /opt/homebrew/opt/{llvm,lld}/bin directly.
-          brew install llvm lld mtools dtc unifdef
+          brew install llvm lld mtools dtc unifdef cmake ninja
+
+      - name: Select Xcode
+        run: |
+          if [ -n "${{ inputs.xcode }}" ]; then
+            echo "DEVELOPER_DIR=/Applications/Xcode_${{ inputs.xcode }}.app/Contents/Developer" >> "$GITHUB_ENV"
+          fi
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR:-runner default}"
 
       - name: Report the toolchain
         run: |

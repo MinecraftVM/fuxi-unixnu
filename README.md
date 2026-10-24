@@ -1,5 +1,11 @@
 # 小米 13（fuxi）跑 UniXNU：构建与部署
 
+> **当前状态（2026-10-24）**
+> - 固件 + UniXNU 界面已在小米 13 真机上跑通（菜单可见）；
+> - payload 卷发现待真机确认：先试 `out/flash-kit/boot-uefi-hello-dt.img`；
+> - XNU（iOS）内核只差一次 macOS Actions 构建：`mode=kernel, config=console`；
+> - 其余环节（补丁、DriverKit 头、ADT、payload 组装、IPSW pin）都已在 Linux 上实测。
+
 把 [UniXNU](https://github.com/UniXNU/UniXNU)（在非 Apple ARM64 硬件上通过 UEFI 跑 Darwin/XNU）
 搬到小米 13（fuxi，SM8550）。这个仓库不重复写驱动，它把**上游已有的 fuxi 半成品**固定版本、
 修掉构建链上会让你卡住的坑（重复的 splash 节点、v3 打包、FD 布局说明），
@@ -62,6 +68,7 @@
    | mode | 第一次选 `uefi`，通过后再选 `full` |
    | config | `upstream`（默认）或 `console`（实验：绕开需要 prelink 候选的归档） |
    | chip_id | `full` 必填，16 位十六进制：`openssl rand -hex 8` |
+   | xcode | 留空用 runner 默认；需要时填 `/Applications` 下的版本号 |
    | 其他 | 保持默认（上游按 commit 固定） |
 
 3. 工作流会先跑一个 **Ubuntu 预检**（配置修正 + IPSW kernelcache pin 校验 + defconfig 守卫检查 + 设备选择），
