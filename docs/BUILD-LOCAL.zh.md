@@ -157,6 +157,31 @@ kernelcache pin: OK
 里的值：那两个 pin 是 `scripts/build-original-system-trust.py` 把两段模块拼成的 bundle 的哈希，
 而这个脚本还需要设备自己的 `static-trustcache.bin`。所以 trust cache 这一项要等真实设备输入。
 
+## 4c. 验证内核源码准备（不需要 Mac）
+
+内核步骤在调用 Xcode 之前有一段纯 git/python 的工作，可以在 Linux 上完整验证：
+
+```sh
+cd UniXNU/out/fuxi/tree
+git clone -q --shared refer/xnu .cache/xnu-work
+for P in "$PWD"/patches/xnu/*.patch "$PWD"/kits/NativePrelink/patches/*.patch; do
+  git -C .cache/xnu-work apply --reverse --check "$P" >/dev/null 2>&1 && continue
+  git -C .cache/xnu-work apply --check "$P" && git -C .cache/xnu-work apply "$P"
+done
+python3 scripts/prepare-xnu-source.py
+```
+
+实测（2026-10-24）：
+
+```
+applied=58 failed=0                         # 67 files changed, +2454 -92
+Restored 26 omitted public headers from Apple; blob hashes verified
+```
+
+注意一个坑：`git -C dir apply RELATIVE.patch` 的相对路径是相对 **dir** 解析的，
+所以补丁路径要用 `$PWD/...`（构建脚本本身用的就是绝对路径）。我第一次用相对路径，
+58 个补丁全部“失败”，其实是找不到文件。
+
 ## 5. QEMU 冒烟测试（本机已跑通）
 
 不接手机也能验证「UniXNU.efi + FAT payload + 配置 + 菜单 + 启动 EFI 应用」这条链。

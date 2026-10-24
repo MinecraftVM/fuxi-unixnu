@@ -37,6 +37,7 @@
 | IPSW 身份 + kernelcache sha256 固定值 | ✅ 实测 | `scripts/verify-ipsw.py`：`f18b4df…` 与 board.toml 一致 |
 | trust cache bundle 的两个 pin | ⏳ 需要设备 `static-trustcache.bin` | 原始成员哈希不等于 bundle 哈希 |
 | 构建修正脚本在全新 clone 上可用 | ✅ 实测 | 新 clone + `apply-fixes.py --console/--probe/--ramdisk-full` 全部通过 |
+| XNU 补丁序列 + DriverKit 头恢复 | ✅ Linux 实测 | 58/58 补丁，67 文件；26 个头，blob 哈希校验 |
 | fuxi 真机固件 | ⏳ 待你测 | `boot-uefi-only.img` |
 | macOS 上编 XNU 内核 | ⏳ 待 Actions | workflow `mode=full` |
 
