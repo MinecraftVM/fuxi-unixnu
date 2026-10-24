@@ -55,7 +55,7 @@
 | --- | --- | --- | --- |
 | `uefi` | 只有 UEFI 固件 + UniXNU 菜单的 boot.img | 先确认固件能启动、屏幕能亮、菜单能进 | 否 |
 | `kernel` | 只编 XNU 并上传 `kernel.macho` | 交给本地组装（见 [ASSEMBLE-LOCAL.zh.md](docs/ASSEMBLE-LOCAL.zh.md)），省 macOS 分钟 | 是 |
-| `full` | 固件 + XNU 内核 + ADT + payload | 真正进 XNU 控制台 | 是（iPadOS 17.7.11 的 kernelcache/trust cache） |
+| `full` | 固件 + XNU 内核 + ADT + 64 MiB payload | 真正进 XNU 控制台 | 是（iPadOS 17.7.11 的 kernelcache/trust cache） |
 
 建议先用 `uefi` 模式验证硬件通路，再跑 `full`。
 

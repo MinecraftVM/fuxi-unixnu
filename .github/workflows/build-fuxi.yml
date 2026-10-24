@@ -255,6 +255,11 @@ jobs:
             args+=(--console)
             echo "experimental console configuration: source-only archives, no NativeAES/BootProgress/UFS"
           fi
+          if [ "$MODE" = full ]; then
+            # The ABL only made room for 64 MiB of boot-image ramdisk on fuxi.
+            args+=(--payload-size 64)
+            echo "full mode: [payload] size_mib = 64 (the kernel is ~46 MB)"
+          fi
           python3 self/scripts/apply-fixes.py --uefi uefi --device device "${args[@]}"
 
       - name: Select the device
