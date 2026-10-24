@@ -156,9 +156,10 @@ Lz4FindPayload (
 {
   UINTN  Offset;
 
-  for (Offset = 0; (Offset + 4) <= Length; Offset += 4) {
+  for (Offset = 0; (Offset + 4) <= Length; Offset++) {
     if (Lz4Read32 (Range + Offset) == 0x184C2102u) {
-      UINT8  *Out = AllocatePool (0x4000000);
+      UINTN    Pages = EFI_SIZE_TO_PAGES (0x4000000);
+      UINT8    *Out  = (UINT8 *)(UINTN)AllocatePages (Pages);
       if (Out != NULL) {
         UINTN   Got   = Lz4LegacyDecompress (Range + Offset, Length - Offset, Out, 0x4000000);
         UINT64  Total = 0;
@@ -166,9 +167,9 @@ Lz4FindPayload (
           *Bytes = (UINTN)(Total * 512);
           return Out;
         }
-        FreePool (Out);
+        FreePages (Out, Pages);
       }
-      break;
+      /* A false magic in unrelated data is possible; keep looking. */
     }
   }
   return NULL;
