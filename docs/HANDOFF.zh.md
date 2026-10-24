@@ -50,17 +50,30 @@ xcode  = 留空
 
 ### 4.2 真机 payload 发现
 
+**已定位的机制**（2026-10-24 真机日志）：
+
+- ABL 把 boot image 的 ramdisk **接在 vendor ramdisk 后面**放进同一个 initrd：
+  两次日志的 `initrd size` 相差正好 64 MiB；
+- 起始地址 `initrd-start + vendor_size` **不是 512 字节对齐**（例如 `B3FFFBB9`），
+  所以所有按 512 B 步长的扫描都会跳过去；
+- 因此 `--discover` 在 `[initrd-start, initrd-end)` 内**按字节**搜 `FUXIESP` 标签，
+  回推 0x47 校验 BPB；模拟缓冲验证命中 `B3FFFBB9`。
+
+测试镜像：`out/boot-uefi-hello-label64.img`（64 MiB payload）。
+
 ```sh
-fastboot boot out/flash-kit/boot-uefi-hello-dt.img
+fastboot boot out/boot-uefi-hello-label64.img
 ```
 
-菜单里出现 **fuxi: UEFI hello (no XNU)** 即成功。日志关注：
+日志关注：
 
 ```
-FUXIRAMDISK: scanning below the device tree 0x...
-FUXIRAMDISK: chosen initrd-start=0x...
-FUXIRAMDISK: payload at 0x... 
+FUXIRAMDISK: label scan in B22B5000..B7FFEBB9 (5D48BB9 bytes)
+FUXIRAMDISK: payload at B3FFFBB9 (label at +...)
 ```
+
+命中后菜单里出现 **fuxi: UEFI hello (no XNU)**。工作流已固定 `--discover`，CI 产出的
+boot.img 带同样的发现逻辑。
 
 ## 5. 已知限制
 
