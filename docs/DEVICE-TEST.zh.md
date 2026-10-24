@@ -658,3 +658,22 @@ failed to mount root device
 - `out/iosroot/root.img`：16 GiB **HFSX**，卷标 `iOSRoot`，UUID `0e94315f-…`（来自上游 iosroot-build 产物）；
 - 与 ADT 的 `root-match-volume-uuid`（iPadOS APFS 卷）不同，需要按上游 `rd=ufsroot0` + root extents 的方式交给内核；
 - 我们的 UniXNU 路径目前没有存储栈，也没有 extents 支持；上游 `fuxi-loader-build/` 已实现（FIEMAP + ADT extent 表）。
+## 1v. 转向上游 loader（B2）的现状（2026-10-25）
+
+- 上游 loader 已在本机复现构建：`Image` 17,677,840 字节（ARM64 Image，内嵌 payload + GPU 固件）；
+- 上游 root 方案：userdata 里的 pinned 文件 → FIEMAP → ADT 的 `fuxi-root-extents`（u64 三元组）
+  + `fuxi-root-blocks`；
+- `mkadt-fuxi.py --template` **不允许**改 extents；必须用 `--live-fdt` 重新生成：
+  ```
+  mkadt-fuxi.py out --live-fdt <设备现场 FDT> --root-extents <fiemap.json> --root-bytes <n> --gpu-reserve
+  ```
+- 本机 `uefi-fuxi/Resources/DTBs/fuxi.dtb` 的 memory 节点只声明了较小 RAM，
+  mkadt 报 `requested XNU RAM is outside advertised memory`——需要**设备现场 FDT**（ABL 传进来的那份）。
+
+### 下一步（按顺序）
+
+1. 从设备取 **live FDT**（可在我们的固件里加一个 dump，或从上游 probe 取）；
+2. 把 `root.img`（16 GiB HFSX，已解压在 `out/iosroot/root.img`）刷到 userdata；
+3. 生成 extents JSON（直刷时是 `[[0,0,size]]`）；
+4. `mkadt-fuxi.py --live-fdt ... --root-extents ... --root-bytes 17179869184 --gpu-reserve`；
+5. 用新 ADT 替换 payload 里的 ADT（adt_off/adt_size）、重编 loader `Image`、打包 boot.img、`fastboot boot`。
