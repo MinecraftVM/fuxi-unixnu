@@ -523,4 +523,12 @@ FUXIRAMDISK: anchor +1D48BB9: FCC08ED8 BE0100B9 00BF7C00 EAA5F380
 原始 FAT 拷进去（内容像未初始化的 DRAM）。最可能的原因是它期待**压缩过的 ramdisk**，
 解压失败后跳过了拷贝。
 
-下一步：`boot-uefi-hello-gz2.img`（ramdisk = gzip(64 MiB FAT)，压缩后 77 KB）。
+下一步是两张压缩 ramdisk 的镜像：
+
+| 镜像 | ramdisk 格式 | 大小 |
+| --- | --- | --- |
+| `boot-uefi-hello-gz2.img` | gzip(64 MiB FAT) | 1.9 MB |
+| `boot-uefi-hello-lz42.img` | **LZ4 legacy**（和 vendor ramdisk 同格式，magic `0x184C2102`） | 2.1 MB |
+
+若 lz42 的 anchor 出现 `02214c18`（LZ4 magic），说明 ABL **拷贝了压缩数据但不解压**——
+那样就在固件里加一个 LZ4 block 解码器，把 payload 解到内存再挂载。
