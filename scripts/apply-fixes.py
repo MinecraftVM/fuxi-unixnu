@@ -673,6 +673,21 @@ def enable_ramdisk_below_dt(uefi: Path) -> None:
         write_text(inf, inf_text.replace(anchor, anchor + "  DebugLib\n", 1), inf_crlf)
 
 
+
+def set_payload_size(device: Path, size: int) -> None:
+    """Rewrite [payload] size_mib; a bootloader may cap the ramdisk it loads."""
+    board = device / "board.toml"
+    content, crlf = read_text(board)
+    head, separator, tail = content.partition("[payload]")
+    if not separator:
+        raise SystemExit(f"{board}: no [payload] section")
+    new_tail, count = re.subn(r"(?m)^size_mib = \d+$", f"size_mib = {size}", tail, count=1)
+    if count == 0:
+        raise SystemExit(f"{board}: [payload] has no size_mib")
+    write_text(board, head + separator + new_tail, crlf)
+    print(f"{board}: [payload] size_mib = {size}")
+
+
 def enable_debug_conout(uefi: Path) -> None:
     """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
 
@@ -754,6 +769,8 @@ def main() -> int:
                         help="after the hint misses, try /chosen, the kernel window and conventional memory")
     parser.add_argument("--ramdisk-below-dt", action="store_true",
                         help="scan 256 MiB below the device tree handed over in x0")
+    parser.add_argument("--payload-size", type=int, default=0,
+                        help="rewrite [payload] size_mib (a bootloader may cap the ramdisk)")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -798,6 +815,8 @@ def main() -> int:
         enable_ramdisk_full(Path(args.uefi))
     if args.ramdisk_below_dt:
         enable_ramdisk_below_dt(Path(args.uefi))
+    if args.payload_size:
+        set_payload_size(Path(args.device), args.payload_size)
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)
