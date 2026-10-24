@@ -186,6 +186,8 @@ def main():
                         help="gzip the ramdisk first; some bootloaders only decompress a compressed ramdisk")
     parser.add_argument("--lz4-ramdisk", action="store_true",
                         help="compress the ramdisk with legacy lz4 (lz4 -l) before packing")
+    parser.add_argument("--raw-kernel", action="store_true",
+                        help="do not gzip the kernel field; the bootloader jumps straight into BootShim")
     parser.add_argument("--payload-after-dtb", action="store_true",
                         help="append the payload after the device tree inside the kernel field "
                              "(when the bootloader ignores the ramdisk field)")
@@ -217,8 +219,6 @@ def main():
         ramdisk_kind = f"{ramdisk_kind}, gzipped {raw_size} -> {len(ramdisk)} bytes"
         print(f"gzip ramdisk: {raw_size} -> {len(ramdisk)} bytes")
     if ramdisk and args.lz4_ramdisk:
-        import subprocess
-        import tempfile
         with tempfile.TemporaryDirectory(prefix="fuxi-lz4-") as work:
             plain = Path(work) / "ramdisk.bin"
             packed = Path(work) / "ramdisk.lz4"
@@ -246,12 +246,13 @@ def main():
             Path(ramdisk_path).write_bytes(ramdisk)
         if args.payload_after_dtb:
             kernel_with_payload = Path(scratch) / "kernel-with-payload.bin"
-            kernel_with_payload.write_bytes(gzip_stream + dtb + ramdisk)
+            head = combined if args.raw_kernel else gzip_stream
+            kernel_with_payload.write_bytes(head + dtb + ramdisk)
             packer = Path(uefi) / "tools" / "mkbootimg_v3.py"
             result = run([sys.executable, str(packer), "pack", "--kernel", str(kernel_with_payload),
                           "--out", args.out])
             pack_output = result.stdout.strip()
-            report = verify_kernel_payload(args.out, gzip_stream + dtb + ramdisk)
+            report = verify_kernel_payload(args.out, (combined if args.raw_kernel else gzip_stream) + dtb + ramdisk)
         else:
             pack_output = pack(uefi, gzip_path, str(Path(args.dtb).resolve()), ramdisk_path, args.out)
             report = verify(args.out, combined, gzip_stream, dtb, ramdisk, ramdisk_path)
@@ -264,6 +265,7 @@ def main():
         "ramdisk_gzip": bool(args.gzip_ramdisk),
         "ramdisk_lz4": bool(args.lz4_ramdisk),
         "payload_after_dtb": bool(args.payload_after_dtb),
+        "raw_kernel": bool(args.raw_kernel),
         "config": args.config, "packer": pack_output,
     })
     Path(args.out).with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
