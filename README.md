@@ -104,6 +104,9 @@ scripts/pack-bootimg-v3.py         BootShim + 固件 + DTB + payload → boot.im
 docs/DEPLOY.zh.md                  部署、验证、排障、回滚
 docs/STATUS.zh.md                  移植进度、还缺什么、下一步怎么做
 docs/BUILD-LOCAL.zh.md             无 Mac / 无 GitHub 时在 Linux 本地只编固件（实测步骤）
+docs/DEVICE-TEST.zh.md             上机测试协议、数据采集、反馈模板
+scripts/gpt-userdata.py            从 GPT 转储读 userdata 的 LBA（board.toml 用）
+scripts/blob-scan.py               从 xbl_config 转储核对固件卷窗口（[uefi_fd]）
 ```
 
 ## 上游版本固定
