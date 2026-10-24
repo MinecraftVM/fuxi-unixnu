@@ -507,8 +507,59 @@ def enable_ramdisk_full(uefi: Path) -> None:
             if (Prop != NULL) {
               UINT64  Start = (Len >= 8) ? Fdt64ToCpu (*(CONST UINT64 *)Prop) : (UINT64)Fdt32ToCpu (*(CONST UINT32 *)Prop);
               UINT64  Total = 0;
-              DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: chosen initrd-start=%lx\n", Start));
               {
+                UINT64      End = 0;
+                INT32       LenEnd = 0;
+                CONST VOID  *PropEnd = FdtGetProp ((CONST VOID *)(UINTN)Dt, Node, "linux,initrd-end", &LenEnd);
+                UINT32      *Words = (UINT32 *)(UINTN)Start;
+                if (PropEnd != NULL) {
+                  End = (LenEnd >= 8) ? Fdt64ToCpu (*(CONST UINT64 *)PropEnd) : (UINT64)Fdt32ToCpu (*(CONST UINT32 *)PropEnd);
+                }
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: chosen initrd %lx..%lx size=%lx\n", Start, End, (End > Start) ? (End - Start) : 0));
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: [%lx] %08x %08x %08x %08x\n", Start, Words[0], Words[1], Words[2], Words[3]));
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: [%lx] %08x %08x %08x %08x\n", Start + 16, Words[4], Words[5], Words[6], Words[7]));
+              }
+              {
+                EFI_STATUS             MapStatus;
+                UINTN                  MapSize = 0;
+                UINTN                  MapKey;
+                UINTN                  DescSize;
+                UINT32                 DescVersion;
+                EFI_MEMORY_DESCRIPTOR  *Map;
+                MapStatus = gBS->GetMemoryMap (&MapSize, NULL, &MapKey, &DescSize, &DescVersion);
+                MapSize += 64 * DescSize;
+                Map = AllocatePool (MapSize);
+                if (Map != NULL) {
+                  MapStatus = gBS->GetMemoryMap (&MapSize, Map, &MapKey, &DescSize, &DescVersion);
+                  if (!EFI_ERROR (MapStatus)) {
+                    UINTN  Index;
+                    for (Index = 0; Index < MapSize / DescSize; Index++) {
+                      EFI_MEMORY_DESCRIPTOR  *Desc = (EFI_MEMORY_DESCRIPTOR *)((UINT8 *)Map + Index * DescSize);
+                      UINT64                 RegionStart = Desc->PhysicalStart;
+                      UINT64                 RegionEnd   = RegionStart + (Desc->NumberOfPages << 12);
+                      if ((Start >= RegionStart) && (Start < RegionEnd)) {
+                        UINT64  Probe;
+                        UINT64  Total = 0;
+                        DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: initrd region %lx..%lx type=%u\n", RegionStart, RegionEnd, Desc->Type));
+                        if (RegionEnd - RegionStart > 0x40000000ULL) {
+                          RegionEnd = RegionStart + 0x40000000ULL;
+                        }
+                        for (Probe = RegionStart; Probe + FUXI_BLOCK_SIZE <= RegionEnd; Probe += FUXI_BLOCK_SIZE) {
+                          if (IsPayloadVolume ((UINT8 *)(UINTN)Probe, &Total)) {
+                            DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx in the initrd region\n", Probe));
+                            mVolumeBase  = (UINT8 *)(UINTN)Probe;
+                            mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                            break;
+                          }
+                        }
+                        break;
+                      }
+                    }
+                  }
+                  FreePool (Map);
+                }
+              }
+              if (mVolumeBase == NULL) {
                 UINT64  Probe;
                 UINT64  From = (Start > 0x400000ULL) ? (Start - 0x400000ULL) : 0;
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: chosen window scan +-4 MiB\n"));

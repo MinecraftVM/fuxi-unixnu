@@ -318,6 +318,40 @@ FUXIRAMDISK: payload at 0x... below the device tree
 - `x0=…7A085000`：很可能丢了最高位，真实值是 **`0xBA085000`** 一类的高地址（正好在
   Kernel 窗口尾部/紧邻），和“payload 在 DT 下方”的说法一致。
 
+## 1k. 第二次真机日志（2026-10-24）
+
+```
+FUXIRAMDISK: entry (debug path)
+FUXIRAMDISK: scanning below the device tree A00B5000
+FUXIRAMDISK: chosen initrd-start=A02B5000
+FUXIRAMDISK: chosen window scan +-4 MiB
+FUXIRAMDISK: scanning kernel window 0xa8000000..0xb8000000
+FUXIRAMDISK: conventional memory scan
+FUXIRAMDISK: no volume; hob=1 base=0xC4C29B14
+```
+
+解读：
+
+- DT 在 `0xA00B5000`，`/chosen` 的 `initrd-start = 0xA02B5000`（正好 DT + 2 MiB）；
+- 我们传进去的 `fuxi.dtb` 里 `initrd-start` 原本是 `0xB6017000`，所以 **ABL 确实改写了 /chosen**；
+- 但 `0xA02B5000` 附近没有 FAT BPB——192 MiB 的 payload 没落在那里，或者根本没被加载。
+
+因此新增两张镜像：
+
+| 镜像 | 作用 |
+| --- | --- |
+| `boot-uefi-hello-dump.img` | 打印 `initrd` 的 `start..end`、头 32 字节 hexdump，并扫描 initrd 所在的内存描述符 |
+| `boot-uefi-hello-64.img` | 同样固件，但 payload 只有 **64 MiB**，用来验证 ABL 是否对 ramdisk 大小有限制 |
+
+预期日志：
+
+```
+FUXIRAMDISK: chosen initrd A02B5000..A??????? size=...
+FUXIRAMDISK: [A02B5000] eb3c90... / 00000000 ...
+FUXIRAMDISK: initrd region 89800000..a2a00000 type=0
+FUXIRAMDISK: payload at ... in the initrd region      ← 命中
+```
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；
