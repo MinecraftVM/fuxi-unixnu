@@ -81,14 +81,18 @@ cp out/<board>/kernel/kernel.macho out/<board>/tree/build/native-prelink/<candid
 既然上游配置在新 checkout 上很可能缺归档，这个仓库给了一条**可选**的旁路：
 
 - 写入 `configs/fuxi_console_defconfig`，只保留能从源码归档链接出来的东西：
-  `corecrypto`（普通 + namespaced）、`libpthread-kernel`、`ArmDTPlatform`、`ArmCpu`；
+  `corecrypto`（普通 + namespaced）、`libpthread-kernel`、`ArmDTPlatform`、`ArmCpu`、
+  **`libBootProgress` + legacy display stub**；
 - 同步把 `board.toml` 的 `[kernel] defconfig` 和 `archives` 改成这 5 项，
   避免 defconfig 和归档列表对不上；
 - 不碰固件、payload、内核参数、ADT。
 
-预期效果：全新 CI checkout 也能编出 `kernel.macho`（不再依赖 NativeAES / boot progress /
-UFS / legacy display 的 prelink 候选）。代价是**没有 boot progress 图层**，
-屏幕输出主要靠 payload 步骤打进内核的 panic 屏；触控/显示/存储仍然没有。
+预期效果：全新 CI checkout 也能编出 `kernel.macho`（不再依赖 NativeAES / UFS /
+NativeLegacyDisplay 的 prelink 候选）。
+
+**boot progress 是刻意保留的**：它是显示驱动出现之前唯一能画东西的层，而且它的 board observer
+会保留 UEFI GOP 的映射前缀，payload 步骤注入的 panic 屏在拿不到 `vinfo.v_baseaddr` 时会退回到它。
+去掉它，内核即使起来了也可能一个像素都不亮。代价仍然是没有触控/显示/存储驱动。
 
 风险要说清楚：这是本仓库的实验配置，**没有在 macOS 或真机上验证过**。
 如果链接仍缺符号，日志会直接告诉我们缺哪个 archive，再按日志补。

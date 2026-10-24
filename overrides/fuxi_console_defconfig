@@ -7,13 +7,17 @@
 # never built. See docs/FULL-MODE.zh.md.
 #
 # This configuration keeps only what links from source archives:
-#   corecrypto (plain + namespaced), libpthread-kernel, ArmDTPlatform, ArmCpu
+#   corecrypto (plain + namespaced), libpthread-kernel, ArmDTPlatform, ArmCpu,
+#   the board boot-progress archive and the legacy display stub.
 # Crypto bootstrap stays "prelinked": the original kernelcache provides the
 # closure, the link only adds the namespaced corecrypto archive.
 #
-# No NativeAES, no BootProgress, no legacy display stub, no UFS, no Adreno.
-# The kernel can reach the platform expert and panic on the missing root; the
-# payload step patches the panic screen into this kernel.
+# Boot progress is kept on purpose: it is the only thing that draws before any
+# display driver exists, and its board observer retains the UEFI GOP mapping the
+# payload's panic screen falls back to. Dropping it would leave a booting kernel
+# with no visible output at all.
+#
+# No NativeAES, no UFS, no Adreno, no owner-root/storage stack.
 
 CONFIG_XNU_BUILD_ARCHIVES=y
 CONFIG_XNU_SOURCE_CORECRYPTO14=y
@@ -24,4 +28,6 @@ CONFIG_XNU_TRUST_CACHE_RUNTIME=y
 CONFIG_XNU_DT_PANIC_REGION=y
 CONFIG_XNU_NATIVE_ARCH_TIMER=y
 CONFIG_XNU_NATIVE_PAN=y
+CONFIG_XNU_BOOT_PROGRESS=y
+CONFIG_XNU_EXTRA_LD_ARCHIVES="{tree}/build/legacy-stub/libLegacyStub.a"
 CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"
