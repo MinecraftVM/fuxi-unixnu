@@ -343,6 +343,14 @@ jobs:
           (cd unixnu && ./unixnu status) > out/logs/status.txt 2>&1 || true
           ls -la out out/logs
 
+      - name: Show the failing kernel log
+        if: failure() && (inputs.mode == 'full' || inputs.mode == 'kernel')
+        run: |
+          echo '::group::kernel.log (tail)'
+          tail -n 150 unixnu/out/fuxi/logs/kernel.log 2>/dev/null || true
+          echo '::endgroup::'
+          ls -la unixnu/out/fuxi/logs || true
+
       - name: Upload the boot image
         if: always()
         uses: actions/upload-artifact@v4
