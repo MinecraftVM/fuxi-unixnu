@@ -225,12 +225,12 @@ jobs:
           missing=0
           for tool in cmake ninja xcodebuild unifdef clang git make; do
             if ! command -v "$tool" >/dev/null; then
-              echo "::error::::$tool is missing on the runner"
+              echo "::error::$tool is missing on the runner"
               missing=1
             fi
           done
-          exit "$missing"
           df -h "$GITHUB_WORKSPACE"
+          exit "$missing"
 
       - name: Apply the fuxi build fixes
         run: |
