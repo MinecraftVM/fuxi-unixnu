@@ -34,6 +34,12 @@
 在一棵全新的 CI checkout 上，这三个 `.a` 都不存在，链接大概率报
 `ld: library not found`。作者本机大概率是之前手动跑过这些脚本，文件还在 `build/` 里。
 
+还有一层：`build-native-aes-bindings.py` 才是 `libNativeAES.a` 的生产者，而
+`build-xnu-4k-baseline.sh` 里对 `CONFIG_XNU_NATIVE_AES=y` 直接写着
+“NativeAES currently requires the qualified original AES/crypto prelink closure”。
+也就是说 `fuxi_defconfig` 里的 `CONFIG_XNU_NATIVE_AES=y` 本身就需要一份
+预链接基线，而那份基线只能由一次更早的构建产生。
+
 **如果要修**：给 defconfig 加 `CONFIG_XNU_BUILD_ARCHIVES=y`，并把
 `board.toml` 里和存储有关的两项先去掉（`CONFIG_XNU_NATIVE_UFS=n`，defconfig 的注释也是这个意思）：
 

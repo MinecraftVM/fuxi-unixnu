@@ -35,6 +35,10 @@ RULES = [
      re.compile(r"Unexpected public Darwin 23 IOStorageFamily source"),
      "The feeds.toml pin does not match the revision audit-storage-interface.py asserts. "
      "Restore feeds.toml or override unixnu fetch."),
+    ("NativeAES needs the prelink closure",
+     re.compile(r"NativeAES currently requires|qualified original AES/crypto prelink"),
+     "CONFIG_XNU_NATIVE_AES=y requires a prelink baseline that a fresh checkout does not have; "
+     "a console-only configuration has to drop it or supply the candidate. See docs/FULL-MODE.zh.md."),
     ("tool missing",
      re.compile(r"\b(clang|cmake|ninja|unifdef|mformat|mcopy|llvm-objcopy|llvm-nm|ld\.lld|xcodebuild|xcrun|compression_tool)\b[^\n]*not found|command not found: (clang|cmake|ninja|unifdef|xcodebuild|xcrun|compression_tool)"),
      "The runner image or the brew step does not provide a tool the step needs."),
