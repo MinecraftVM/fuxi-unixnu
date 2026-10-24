@@ -15,9 +15,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "uefi = firmware only; full = kernel + payload + boot image"
+        description: "uefi = firmware only; kernel = kernel only (assemble locally); full = everything"
         type: choice
-        options: [full, uefi]
+        options: [full, kernel, uefi]
         default: full
       config:
         description: "upstream = the repository as checked in; console = experimental source-only archives"
@@ -262,13 +262,13 @@ jobs:
           ./unixnu fetch
 
       - name: Fetch the IPSW components
-        if: inputs.mode == 'full'
+        if: inputs.mode == 'full' || inputs.mode == 'kernel'
         run: |
           cd unixnu
           ./unixnu ipsw fetch
 
       - name: Run pre-build steps
-        if: inputs.mode == 'full' && inputs.pre_build != ''
+        if: (inputs.mode == 'full' || inputs.mode == 'kernel') && inputs.pre_build != ''
         env:
           PRE_BUILD: ${{ inputs.pre_build }}
           DEVICE_DIR: ${{ github.workspace }}/device
@@ -277,17 +277,19 @@ jobs:
           bash -euo pipefail -c "$PRE_BUILD"
 
       - name: Build the kernel
-        if: inputs.mode == 'full'
+        if: inputs.mode == 'full' || inputs.mode == 'kernel'
         run: |
           cd unixnu
           ./unixnu build kernel
 
       - name: Build the UniXNU package
+        if: inputs.mode != 'kernel'
         run: |
           cd unixnu
           ./unixnu build package
 
       - name: Build the firmware
+        if: inputs.mode != 'kernel'
         run: |
           cd unixnu
           ./unixnu build firmware --uefi "$UNIXNU_UEFI"
@@ -305,6 +307,7 @@ jobs:
           ./unixnu build payload "${args[@]}"
 
       - name: Pack the boot image
+        if: inputs.mode != 'kernel'
         run: |
           mkdir -p out
           fd="$UNIXNU_UEFI/Build/fuxiPkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd"
@@ -332,12 +335,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fuxi-${{ inputs.mode }}-boot-${{ github.run_number }}
+          name: fuxi-${{ inputs.mode }}-${{ github.run_number }}
           path: |
             out/boot.img
             out/boot.json
             out/logs/
             unixnu/out/fuxi/payload/payload.json
+            unixnu/out/fuxi/kernel/
           if-no-files-found: warn
           retention-days: 14
 

@@ -46,7 +46,8 @@
 | 模式 | 产物 | 用途 | 需要 Apple 输入 |
 | --- | --- | --- | --- |
 | `uefi` | 只有 UEFI 固件 + UniXNU 菜单的 boot.img | 先确认固件能启动、屏幕能亮、菜单能进 | 否 |
-| `full` | 固件 + XNU 内核 + ADT + payload | 真正进 XNU 控制台（panic 屏/启动进度） | 是（iPadOS 17.7.11 的 kernelcache/trust cache） |
+| `kernel` | 只编 XNU 并上传 `kernel.macho` | 交给本地组装（见 [ASSEMBLE-LOCAL.zh.md](docs/ASSEMBLE-LOCAL.zh.md)），省 macOS 分钟 | 是 |
+| `full` | 固件 + XNU 内核 + ADT + payload | 真正进 XNU 控制台 | 是（iPadOS 17.7.11 的 kernelcache/trust cache） |
 
 建议先用 `uefi` 模式验证硬件通路，再跑 `full`。
 
@@ -124,6 +125,7 @@ scripts/pack-bootimg-v3.py         BootShim + 固件 + DTB + payload → boot.im
 docs/DEPLOY.zh.md                  部署、验证、排障、回滚
 docs/STATUS.zh.md                  移植进度、还缺什么、下一步怎么做
 docs/BUILD-LOCAL.zh.md             无 Mac / 无 GitHub 时在 Linux 本地只编固件（实测步骤）
+docs/ASSEMBLE-LOCAL.zh.md          只在云端编内核，payload 和 boot.img 在本地组装
 docs/DEVICE-TEST.zh.md             上机测试协议、数据采集、反馈模板
 docs/FULL-MODE.zh.md               full 模式已知缺口：静态库链与 prelink 候选
 scripts/gpt-userdata.py            从 GPT 转储读 userdata 的 LBA（board.toml 用）
