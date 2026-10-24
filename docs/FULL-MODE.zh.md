@@ -90,9 +90,23 @@ cp out/<board>/kernel/kernel.macho out/<board>/tree/build/native-prelink/<candid
 预期效果：全新 CI checkout 也能编出 `kernel.macho`（不再依赖 NativeAES / UFS /
 NativeLegacyDisplay 的 prelink 候选）。
 
-**boot progress 是刻意保留的**：它是显示驱动出现之前唯一能画东西的层，而且它的 board observer
-会保留 UEFI GOP 的映射前缀，payload 步骤注入的 panic 屏在拿不到 `vinfo.v_baseaddr` 时会退回到它。
-去掉它，内核即使起来了也可能一个像素都不亮。代价仍然是没有触控/显示/存储驱动。
+**boot progress 在 console 配置里是关闭的**，这不是偷懒：`build-xnu-4k-baseline.sh` 里写死了
+
+```sh
+if [ "$BOOT_PROGRESS" = 1 ]; then
+  if [ XNU_NATIVE_UFS != 1 ] || [ XNU_OWNER_ROOT_AUDIT != 1 ] ||
+     [ XNU_NATIVE_VIRTIO_BLOCK != 1 ] || [ XNU_SOURCE_CORECRYPTO14 != 1 ]; then
+    echo 'Boot progress requires the audited UFS/owner-root, Virtio and source-corecrypto build' >&2
+    exit 1
+  fi
+```
+
+而 UFS/owner-root/VirtIO 都依赖 prelink 候选——正是全新 checkout 没有的东西。所以第一版内核
+**没有自己的屏幕输出**：DarwinBoot 的交接日志和 UniXNU 仍然可见，panic 屏要等后续配置引入
+framebuffer 来源（GOP 映射或板级 observer）后才能画出来。
+
+顺带说明：`zzz-boot-progress.patch` 用 `#if XNU_BOOT_PROGRESS` 包住所有调用，所以关掉它
+是干净地编译掉，不会留下未定义符号。
 
 风险要说清楚：这是本仓库的实验配置，**没有在 macOS 或真机上验证过**。
 如果链接仍缺符号，日志会直接告诉我们缺哪个 archive，再按日志补。
