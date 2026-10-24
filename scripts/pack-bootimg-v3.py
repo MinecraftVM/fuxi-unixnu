@@ -128,6 +128,26 @@ def pack(uefi, gzip_stream, dtb, ramdisk, out):
     return result.stdout.strip()
 
 
+def verify_kernel_payload(image, expected_field):
+    """The payload rides after the device tree in the kernel field; the ramdisk field stays empty."""
+    data = Path(image).read_bytes()
+    magic, kernel_size, ramdisk_size, _os, header_size, *rest = struct.unpack_from("<8sIIII8I", data, 0)
+    header_version = struct.unpack_from("<I", data, 40)[0]
+    if magic != BOOT_MAGIC:
+        raise PackError("not an ANDROID! image")
+    if header_version != HEADER_VERSION or header_size != HEADER_SIZE:
+        raise PackError(f"unexpected header ({header_version}, {header_size})")
+    kernel_at = (header_size + PAGE - 1) // PAGE * PAGE
+    field = data[kernel_at:kernel_at + kernel_size]
+    if field != expected_field:
+        raise PackError("the kernel field is not gzip(BootShim + firmware) + device tree + payload")
+    if ramdisk_size != 0:
+        raise PackError(f"the ramdisk field is {ramdisk_size} bytes; expected it empty")
+    return {"header_version": header_version, "header_size": header_size, "kernel_at": hex(kernel_at),
+            "kernel_size": kernel_size, "ramdisk_size": ramdisk_size, "image_bytes": len(data),
+            "payload_in_kernel_field": True}
+
+
 def verify(image, combined, gzip_stream, dtb, ramdisk, ramdisk_path):
     """Unpack the image and compare every part with its input."""
     data = Path(image).read_bytes()
@@ -164,6 +184,9 @@ def main():
     parser.add_argument("--ramdisk", default="", help="UniXNU payload image; omitted means an empty ramdisk")
     parser.add_argument("--gzip-ramdisk", action="store_true",
                         help="gzip the ramdisk first; some bootloaders only decompress a compressed ramdisk")
+    parser.add_argument("--payload-after-dtb", action="store_true",
+                        help="append the payload after the device tree inside the kernel field "
+                             "(when the bootloader ignores the ramdisk field)")
     parser.add_argument("--out", default="boot.img", help="output boot image")
     parser.add_argument("--fd-base", default="", help="override [uefi_fd] base from the device config")
     parser.add_argument("--fd-size", default="", help="override [uefi_fd] size from the device config")
@@ -204,8 +227,17 @@ def main():
         if ramdisk and args.gzip_ramdisk:
             ramdisk_path = str(Path(scratch) / "ramdisk.gz")
             Path(ramdisk_path).write_bytes(ramdisk)
-        pack_output = pack(uefi, gzip_path, str(Path(args.dtb).resolve()), ramdisk_path, args.out)
-        report = verify(args.out, combined, gzip_stream, dtb, ramdisk, ramdisk_path)
+        if args.payload_after_dtb:
+            kernel_with_payload = Path(scratch) / "kernel-with-payload.bin"
+            kernel_with_payload.write_bytes(gzip_stream + dtb + ramdisk)
+            packer = Path(uefi) / "tools" / "mkbootimg_v3.py"
+            result = run([sys.executable, str(packer), "pack", "--kernel", str(kernel_with_payload),
+                          "--out", args.out])
+            pack_output = result.stdout.strip()
+            report = verify_kernel_payload(args.out, gzip_stream + dtb + ramdisk)
+        else:
+            pack_output = pack(uefi, gzip_path, str(Path(args.dtb).resolve()), ramdisk_path, args.out)
+            report = verify(args.out, combined, gzip_stream, dtb, ramdisk, ramdisk_path)
 
     report.update({
         "fd_base": hex(base), "fd_size": hex(size), "firmware_bytes": len(firmware),
@@ -213,6 +245,7 @@ def main():
         "fd_sha256": sha256(firmware), "image_sha256": sha256(Path(args.out).read_bytes()),
         "ramdisk_kind": ramdisk_kind,
         "ramdisk_gzip": bool(args.gzip_ramdisk),
+        "payload_after_dtb": bool(args.payload_after_dtb),
         "config": args.config, "packer": pack_output,
     })
     Path(args.out).with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")

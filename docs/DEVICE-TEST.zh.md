@@ -449,3 +449,25 @@ getvar.txt：有/无
 - 不要在没备份的情况下 `fastboot flash userdata`（会清空全部数据）；
 - 不要把 `full` 的 artifact 传到公开仓库（里面有 Apple 的内核/信任缓存）；
 - 不要在电量低于 30% 时刷写。
+## 1l. 如果 ABL 忽略 ramdisk 字段：payload 走 kernel 字段
+
+两次真机日志都显示 `/chosen` 的 initrd 是 LZ4 压缩的 vendor ramdisk，我们的 FAT 始终没出现
+（192 MiB 和 64 MiB 都一样）。如果 `boot-uefi-hello-any64.img` 也扫不到，基本可以确认
+**fuxi 的 ABL 在 `fastboot boot` 时不加载 boot image 的 ramdisk**。
+
+备选传输：把 payload 追加在 **kernel 字段里的设备树之后**。
+
+```
+kernel field = gzip(BootShim + FD) + fuxi.dtb + payload
+ramdisk field = 空
+```
+
+- BootShim 解压 gzip 后仍然在流末尾找到 DTB，把它传给 x0；
+- 驱动（`hello-any*` 固件）会扫描 kernel 字段所在的 DRAM 描述符，从而找到 payload；
+- 打包命令：
+
+```sh
+pack-bootimg-v3.py ... --ramdisk payload-hello-64.img --payload-after-dtb --out boot.img
+```
+
+镜像：`out/boot-uefi-hello-kdtb.img`（69 MB，kernel 字段 68.9 MB，ramdisk 为空）。
