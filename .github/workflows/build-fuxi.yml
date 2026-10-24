@@ -145,7 +145,7 @@ jobs:
             args+=(--fd-base "$FD_BASE" --fd-size "$FD_SIZE")
           fi
           if [ "$CONFIG_MODE" = console ]; then args+=(--console); fi
-          python3 self/scripts/apply-fixes.py --uefi uefi --device device "${args[@]}"
+          python3 self/scripts/apply-fixes.py --uefi uefi --device device "${args[@]}" --discover
 
       - name: Check the IPSW kernelcache pin
         run: |

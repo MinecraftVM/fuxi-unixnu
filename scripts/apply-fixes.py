@@ -978,6 +978,8 @@ def main() -> int:
                         help="print /chosen linux,initrd-start/end from the DT the ABL handed over in x0")
     parser.add_argument("--ramdisk-full", action="store_true",
                         help="after the hint misses, try /chosen, the kernel window and conventional memory")
+    parser.add_argument("--discover", action="store_true",
+                        help="enable the payload discovery chain (same as --ramdisk-full)")
     parser.add_argument("--ramdisk-below-dt", action="store_true",
                         help="scan 256 MiB below the device tree handed over in x0")
     parser.add_argument("--payload-size", type=int, default=0,
@@ -1024,7 +1026,7 @@ def main() -> int:
         enable_memmap_dump(Path(args.uefi))
     if args.dtchosen:
         enable_dt_chosen(Path(args.uefi))
-    if args.ramdisk_full:
+    if args.ramdisk_full or args.discover:
         enable_ramdisk_full(Path(args.uefi))
     if args.ramdisk_below_dt:
         enable_ramdisk_below_dt(Path(args.uefi))

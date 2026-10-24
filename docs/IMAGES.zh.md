@@ -10,7 +10,8 @@
 | 2 | `boot-uefi-diag.img` | 旧基线 + 诊断 | 203 MB | 打印 `FUXIDT:`（x0、`/chosen` initrd）、`FUXIMAP:`（内存布局）、`FUXIRAMDISK:` |
 | 3 | `boot-uefi-diskdbg.img` | 旧基线 + 不 halt | 1.8 MB | 已知能进 UniXNU 界面（Restart / Power off） |
 | 4 | `boot-uefi-probe.img` | 旧基线 + FUXIPROBE | 1.8 MB | 打印 GOP 状态和 FUXIESP 命中后停机 |
-| 5 | `boot-uefi-hello-latest.img` | 上游 `a7f42bfc` + 兜底 | 203 MB | 与 1 类似，但没有 below-DT 扫描 |
+| 5 | `boot-uefi-hello-label64.img` | 最新诊断 | 69 MB | 在 `/chosen` initrd 范围内**按字节**搜 `FUXIESP`（解决非 512 对齐） |
+| 6 | `boot-uefi-hello-latest.img` | 上游 `a7f42bfc` + 兜底 | 203 MB | 与 1 类似，但没有 below-DT 扫描 |
 
 ## 校验值
 
