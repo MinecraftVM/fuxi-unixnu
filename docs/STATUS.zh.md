@@ -36,7 +36,7 @@ FUXIRAMDISK: no volume; hob=1 base=0x…C4C2914   ← SEC 提示在低内存，�
 | UEFI 固件（Mu-Silicium fuxiPkg） | ✅ 真机 | 上游 `c15fe352` 起自带 reporting ramdisk 驱动 |
 | boot.img v3 打包（BootShim+gzip+DTB+ramdisk） | ✅ 本地实测 | `pack-bootimg-v3.py`，逐段回读 |
 | UniXNU.efi + 菜单 + payload 加载 | ✅ QEMU + 真机 | QEMU 里跑过真实 FAT 镜像 |
-| payload 卷发现 | ⏳ 真机排查中 | ramdisk 通道已排除（ABL 只按大小预留、不写数据）；raw kernel 被拒；DTB 内嵌测试中 |
+| payload 卷发现 | ✅ 真机验证 | 通过 vendor_boot ramdisk 替换；菜单出现 hello 项 |
 | ADT 生成 | ✅ Linux 实测 | 13,496 字节，节点/身份值核对 |
 | payload 组装（ADT+FAT+config） | ✅ Linux 实测 | 用真实 kernelcache 跑通（panic 补丁除外） |
 | XNU 源码 + 58 个补丁 | ✅ Linux 实测 | 67 文件，+2454/−92 |
