@@ -2,7 +2,8 @@
 
 > **当前状态（2026-10-24）**
 > - 固件 + UniXNU 界面已在小米 13 真机上跑通（菜单可见）；
-> - payload 卷发现待真机确认：先试 `out/flash-kit/boot-uefi-hello-dt.img`；
+> - payload 传输：`fastboot boot` 的六种方式已在真机验证失败（ABL 只提取内核与设备树）；
+>   剩余路径是改 vendor_boot（需要官方镜像）或等上游；
 > - XNU（iOS）内核只差一次 macOS Actions 构建：`mode=kernel, config=console`；
 >   **第一次构建必须选 `config=console`**（`upstream` 需要预先存在的 prelink 闭包，全新 checkout 一定会失败）；
 > - 其余环节（补丁、DriverKit 头、ADT、payload 组装、IPSW pin）都已在 Linux 上实测。
