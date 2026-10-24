@@ -14,6 +14,7 @@ unixnu="$ROOT/UniXNU"
 fd=""
 out="$ROOT/out/boot-fuxi.img"
 python=${PYTHON:-python3}
+gzip_ramdisk=0
 
 usage() {
   cat <<EOF
@@ -39,6 +40,7 @@ while [ $# -gt 0 ]; do
     --uefi) uefi=$2; shift 2 ;;
     --fd) fd=$2; shift 2 ;;
     --out) out=$2; shift 2 ;;
+    --gzip-ramdisk) gzip_ramdisk=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -79,12 +81,10 @@ fi
 [ -f "$fd" ] || { echo "firmware volume not found: $fd" >&2; exit 1; }
 
 echo "== boot image"
-"$python" "$ROOT/fuxi-unixnu/scripts/pack-bootimg-v3.py" \
-  --uefi "$uefi" \
-  --fd "$fd" \
-  --dtb "$uefi/Resources/DTBs/fuxi.dtb" \
-  --ramdisk "$payload" \
-  --out "$out"
+pack_args=(--uefi "$uefi" --fd "$fd" --dtb "$uefi/Resources/DTBs/fuxi.dtb"
+           --ramdisk "$payload" --out "$out")
+if [ "$gzip_ramdisk" = 1 ]; then pack_args+=(--gzip-ramdisk); fi
+"$python" "$ROOT/fuxi-unixnu/scripts/pack-bootimg-v3.py" "${pack_args[@]}"
 
 echo
 echo "ready: $out"

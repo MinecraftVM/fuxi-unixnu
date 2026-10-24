@@ -13,6 +13,8 @@ bash fuxi-unixnu/scripts/assemble-full.sh --kernel /path/to/kernel.macho --chip-
 脚本会依次完成：payload（ADT + FAT + panic 屏）→ 编固件（如果还没有 FD）→ 打包 boot.img，
 最后打印 sha256。需要 `python3 ≥ 3.11`、`mtools`、`ld.lld`/`llvm-nm` 在 PATH 上。
 
+如果真机测试表明 ABL 只解压**压缩的 ramdisk**，加 `--gzip-ramdisk`（64 MiB 的 FAT 会压到 ~77 KB）。
+
 下面是拆开的分步命令。
 
 ## 1. 在 Actions 上只编内核

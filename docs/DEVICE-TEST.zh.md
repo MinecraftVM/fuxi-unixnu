@@ -342,7 +342,7 @@ FUXIRAMDISK: no volume; hob=1 base=0xC4C29B14
 | --- | --- |
 | `boot-uefi-hello-dump.img` | 打印 `initrd` 的 `start..end`、头 32 字节 hexdump，并扫描 initrd 所在的内存描述符 |
 | `boot-uefi-hello-64.img` | 同样固件，但 payload 只有 **64 MiB**，用来验证 ABL 是否对 ramdisk 大小有限制 |
-| `boot-uefi-hello-64gz.img` | ramdisk 字段是 **gzip(64 MiB FAT)**（压缩后 77 KB）：有些 ABL 期待压缩 ramdisk 并解压到 initrd-start |
+| `boot-uefi-hello-64gz.img` | ramdisk 字段是 **gzip(64 MiB FAT)**（压缩后 77 KB）：有些 ABL 期待压缩 ramdisk 并解压到 initrd-start。打包器现支持 `--gzip-ramdisk` |
 
 真实 payload 也可以一键缩小：`apply-fixes.py --payload-size 64` 会把 `[payload] size_mib` 改成 64
 （内核约 46 MB，64 MiB 卷放得下）。

@@ -162,6 +162,8 @@ def main():
     parser.add_argument("--fd", required=True, help="built firmware volume (SILICIUM_UEFI.fd)")
     parser.add_argument("--dtb", required=True, help="compiled device tree (Resources/DTBs/fuxi.dtb)")
     parser.add_argument("--ramdisk", default="", help="UniXNU payload image; omitted means an empty ramdisk")
+    parser.add_argument("--gzip-ramdisk", action="store_true",
+                        help="gzip the ramdisk first; some bootloaders only decompress a compressed ramdisk")
     parser.add_argument("--out", default="boot.img", help="output boot image")
     parser.add_argument("--fd-base", default="", help="override [uefi_fd] base from the device config")
     parser.add_argument("--fd-size", default="", help="override [uefi_fd] size from the device config")
@@ -184,6 +186,12 @@ def main():
         raise PackError(f"{args.dtb} is not a complete flattened device tree")
     ramdisk = Path(args.ramdisk).read_bytes() if args.ramdisk else b""
     ramdisk_kind = describe_ramdisk(ramdisk)
+    if ramdisk and args.gzip_ramdisk:
+        import gzip
+        raw_size = len(ramdisk)
+        ramdisk = gzip.compress(ramdisk, compresslevel=9, mtime=0)
+        ramdisk_kind = f"{ramdisk_kind}, gzipped {raw_size} -> {len(ramdisk)} bytes"
+        print(f"gzip ramdisk: {raw_size} -> {len(ramdisk)} bytes")
     if ramdisk and not ramdisk_kind.startswith("FAT"):
         print(f"warning: the ramdisk is {ramdisk_kind}; UniXNU expects its FAT payload volume here")
 
@@ -193,14 +201,19 @@ def main():
         gzip_stream = gzip.compress(combined, mtime=0)
         gzip_path = Path(scratch) / "kernel.gz"
         gzip_path.write_bytes(gzip_stream)
-        pack_output = pack(uefi, gzip_path, str(Path(args.dtb).resolve()), args.ramdisk, args.out)
-        report = verify(args.out, combined, gzip_stream, dtb, ramdisk, args.ramdisk)
+        ramdisk_path = args.ramdisk
+        if ramdisk and args.gzip_ramdisk:
+            ramdisk_path = str(Path(scratch) / "ramdisk.gz")
+            Path(ramdisk_path).write_bytes(ramdisk)
+        pack_output = pack(uefi, gzip_path, str(Path(args.dtb).resolve()), ramdisk_path, args.out)
+        report = verify(args.out, combined, gzip_stream, dtb, ramdisk, ramdisk_path)
 
     report.update({
         "fd_base": hex(base), "fd_size": hex(size), "firmware_bytes": len(firmware),
         "shim_bytes": len(shim), "gzip_bytes": len(gzip_stream), "dtb_bytes": len(dtb),
         "fd_sha256": sha256(firmware), "image_sha256": sha256(Path(args.out).read_bytes()),
         "ramdisk_kind": ramdisk_kind,
+        "ramdisk_gzip": bool(args.gzip_ramdisk),
         "config": args.config, "packer": pack_output,
     })
     Path(args.out).with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
