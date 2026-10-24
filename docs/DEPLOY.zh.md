@@ -23,7 +23,8 @@
 
 ### 镜像
 
-从 GitHub Actions 的 artifact 里下载 `boot.img` 和 `boot.json`。
+从 GitHub Actions 的 artifact 里下载 `boot.img` 和 `boot.json`；也可以直接用
+[`out/flash-kit/`](IMAGES.zh.md) 里已经打好的镜像。
 
 ## 2. 先验证固件（uefi 模式）
 
@@ -54,6 +55,13 @@ EFI/UniXNU/Payloads/kernel.macho
 EFI/UniXNU/Payloads/kernel.macho.adt   Apple 设备树
 ```
 
+**第一次构建必须选 `config=console`**：`upstream` 需要预先存在的 prelink 闭包，全新 checkout
+会在内核脚本的第一秒被 `BOOT_PROGRESS` 的守卫退出。想省 macOS 分钟可以只跑 `mode=kernel`，
+再按 [ASSEMBLE-LOCAL.zh.md](ASSEMBLE-LOCAL.zh.md) 在本地组装。
+
+启动前先确认固件能找到 payload 卷：用 [IMAGES.zh.md](IMAGES.zh.md) 里的
+`boot-uefi-hello-dt.img` 试一次，菜单里出现 hello 项再继续。
+
 启动：
 
 ```sh
@@ -64,13 +72,12 @@ fastboot boot boot.img
 
 1. UEFI 起来，屏幕有输出；
 2. UniXNU 菜单出现，能看到 `xnu` 项；
-3. 选它之后 DarwinBoot 打印交接信息；
-4. XNU 打印版本/启动参数，随后到达平台专家；
-5. 因为这一版没有显示驱动，**屏幕上的最后画面通常就是 panic 屏**（`panic_screen = true` 已经
-   把 panic 输出补进内核副本）。把屏幕上的文字拍下来，就是最有用的排障材料。
+3. 选它之后 DarwinBoot 打印交接信息（UEFI 控制台仍然可用）；
+4. 之后内核自身**没有屏幕输出**：console 配置关掉了 boot progress（构建脚本的硬性要求，
+   见 [FULL-MODE.zh.md](FULL-MODE.zh.md) 第 8 节），panic 屏也还没有 framebuffer 来源。
+   所以“交接完成后屏幕静止”本身就是一个有效信号。
 
-没有外露 UART：小米 13 没有可用的串口调试口，**一切以屏幕输出为准**。这也是为什么
-`board.toml` 里保留了 `panic_screen` 和 `boot-progress`。
+没有外露 UART：小米 13 没有可用的串口调试口，**一切以屏幕输出为准**。
 
 ## 4. 只启动，不写入
 
