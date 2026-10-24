@@ -10,7 +10,7 @@
  
  extern "C" {
  #include <libkern/amfi/amfi.h>
-@@ -110,6 +113,26 @@
+@@ -110,6 +113,25 @@
  kern_return_t
  IOKitBSDInit( void )
  {
@@ -31,7 +31,6 @@
 +				panic("SHENG-PMGR-STUB: late hook, init failed");
 +			}
 +			nub->registerService();
-+			panic("SHENG-PMGR-STUB: late hook, published (load=%d)", sheng_pmgr_load);
 +		}
 +	}
  	IOService::publishResource("IOBSD");
