@@ -455,6 +455,17 @@ getvar.txt：有/无
 （192 MiB 和 64 MiB 都一样）。如果 `boot-uefi-hello-any64.img` 也扫不到，基本可以确认
 **fuxi 的 ABL 在 `fastboot boot` 时不加载 boot image 的 ramdisk**。
 
+这其实就是**上游设计的本意**。`Sec.c` 里写着：
+
+```c
+// The boot image carries the UniXNU payload right behind the device tree.
+// Publish its address so the payload block driver does not have to guess.
+PayloadBase = gSecEntryArg1 + 0x300000;  // the payload sits just below the device tree
+```
+
+而 `BootShim.S` 把 `x1 = _Payload`（解压后 FD 的起点）传给 SEC，所以 `x1 + 3 MiB` 只是
+"FD 末尾"的近似值——真正可靠的位置是 **DTB 之后**。
+
 备选传输：把 payload 追加在 **kernel 字段里的设备树之后**。
 
 ```

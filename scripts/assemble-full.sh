@@ -15,6 +15,7 @@ fd=""
 out="$ROOT/out/boot-fuxi.img"
 python=${PYTHON:-python3}
 gzip_ramdisk=0
+payload_after_dtb=0
 payload_size=0
 
 usage() {
@@ -43,6 +44,7 @@ while [ $# -gt 0 ]; do
     --out) out=$2; shift 2 ;;
     --payload-size) payload_size=$2; shift 2 ;;
     --gzip-ramdisk) gzip_ramdisk=1; shift ;;
+    --payload-after-dtb) payload_after_dtb=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -91,6 +93,7 @@ echo "== boot image"
 pack_args=(--uefi "$uefi" --fd "$fd" --dtb "$uefi/Resources/DTBs/fuxi.dtb"
            --ramdisk "$payload" --out "$out")
 if [ "$gzip_ramdisk" = 1 ]; then pack_args+=(--gzip-ramdisk); fi
+if [ "$payload_after_dtb" = 1 ]; then pack_args+=(--payload-after-dtb); fi
 "$python" "$ROOT/fuxi-unixnu/scripts/pack-bootimg-v3.py" "${pack_args[@]}"
 
 echo
