@@ -64,7 +64,7 @@
    | chip_id | `full` 必填，16 位十六进制：`openssl rand -hex 8` |
    | 其他 | 保持默认（上游按 commit 固定） |
 
-3. 工作流会先跑一个 **Ubuntu 预检**（配置修正 + IPSW kernelcache pin 校验 + defconfig 选择），
+3. 工作流会先跑一个 **Ubuntu 预检**（配置修正 + IPSW kernelcache pin 校验 + defconfig 守卫检查 + 设备选择），
    预检失败不会消耗 macOS runner 的分钟；通过后才进入 macOS 构建。
 4. 跑完在 Artifacts 下载 `fuxi-*-boot-*`，里面有 `boot.img`、`boot.json` 和日志。
 5. 手机（已解锁 BL）：
@@ -134,6 +134,7 @@ scripts/blob-scan.py               从 xbl_config 转储核对固件卷窗口（
 scripts/diagnose-logs.py           失败日志归类（library not found / prelink / 工具缺失…）
 scripts/qemu-smoke.sh              QEMU/AAVMF 冒烟测试（已验证 UniXNU + payload 链路）
 scripts/verify-ipsw.py             Linux 上核对 IPSW 身份与 kernelcache pin（自建 LZFSE 解码）
+scripts/check-defconfig.py         在 macOS 之前检查 defconfig 是否满足 XNU 构建脚本的硬性要求
 ```
 
 ## 上游版本固定

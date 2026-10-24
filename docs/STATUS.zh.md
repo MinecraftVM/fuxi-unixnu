@@ -70,6 +70,7 @@ FUXIRAMDISK: no volume; hob=1 base=0x…C4C2914   ← SEC 提示在低内存，�
 | `verify-ipsw.py` | Linux 上核对 IPSW 身份与 kernelcache pin |
 | `gpt-userdata.py` / `blob-scan.py` | 从设备转储读 userdata LBA / 固件窗口 |
 | `diagnose-logs.py` | macOS 构建失败日志归类 |
+| `check-defconfig.py` | 在 macOS 之前检查 defconfig 是否违反构建脚本的硬性组合 |
 | `make-test-payload.py` | 生成 hello payload FAT 卷 |
 
 ## 6. 下一步
