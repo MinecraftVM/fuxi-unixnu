@@ -46,6 +46,8 @@
 | 构建修正脚本在全新 clone 上可用 | ✅ 实测 | 新 clone + `apply-fixes.py --console/--probe/--ramdisk-full` 全部通过 |
 | XNU 补丁序列 + DriverKit 头恢复 | ✅ Linux 实测 | 58/58 补丁，67 文件；26 个头，blob 哈希校验 |
 | prelink 的 31 个 root kext | ✅ Linux 实测 | 全部能在 kernelcache 里找到 |
+| payload 非对齐定位（真机日志分析 + 模拟） | ✅ | initrd 两次差值 64 MiB → 标签扫描命中 `B3FFFBB9` |
+| 交付自检矩阵 | ✅ | [docs/AUDIT.zh.md](docs/AUDIT.zh.md)：lint/脚本/检查器全绿 |
 | fuxi 真机固件 | ⏳ 待你测 | `boot-uefi-only.img` |
 | macOS 上编 XNU 内核 | ⏳ 待 Actions | workflow `mode=full` |
 
