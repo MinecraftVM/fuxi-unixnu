@@ -128,6 +128,12 @@ builder 产出，且它们引用的源码在组装后的 `tree/` 里都存在：
 这些 builder 只依赖 XNU 的编译记录（`build/xnu/.../*.o.json`，由 driver 的 bootstrap pass 产生），
 **不依赖** `build/native-prelink/*-candidate.macho`，所以不存在第二段里的 bootstrap 循环。
 
+链接块本身也逐条核对过：console 配置下会进入的只有
+`corecrypto-namespaced`、`ArmDTPlatform`、`ArmCpu`、`libpthread`、`libLegacyStub`
+五项，外加 SDK 里的 `-lfirehose_kernel`（`$KERNEL_SDKROOT/usr/local/lib/kernel`）；
+NativeAES / UFS / VirtIO / Adreno / MobileDisplay / LegacyDisplay / GPU 的分支都因为对应
+CONFIG 为 0 而跳过。
+
 需要说明的是：这是静态闭环，不是链接验证；真正的验证要等 macOS 上跑一次 `mode=full, config=console`。
 
 ## 4. 因此建议的推进方式
