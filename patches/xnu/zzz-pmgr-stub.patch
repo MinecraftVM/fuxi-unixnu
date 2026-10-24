@@ -1,0 +1,58 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -1304,6 +1304,16 @@
+ 		}
+ 	}
+ 
++	/* Console bring-up: publish the original ApplePMGRNub class as a service so
++	 * AMFI finds a PMGR provider (opt-in, boot-arg guarded).
++	 */
++	{
++		int sheng_pmgr_stub = 0;
++		if (PE_parse_boot_argn("sheng-pmgr-stub", &sheng_pmgr_stub, sizeof(sheng_pmgr_stub)) && sheng_pmgr_stub) {
++			extern void sheng_pmgr_stub_publish(void);
++			sheng_pmgr_stub_publish();
++		}
++	}
+ 	kern_return_t result = IOKitBSDInit();
+ #if (DEVELOPMENT || DEBUG) && defined(XNU_NATIVE_LEGACY_DISPLAY) && XNU_NATIVE_LEGACY_DISPLAY
+ 	/* The original IOSurface personality requires the genuine IOBSD resource.
+--- a/iokit/Kernel/IOService.cpp
++++ b/iokit/Kernel/IOService.cpp
+@@ -9154,3 +9154,36 @@
+ OSMetaClassDefineReservedUnused(IOService, 45);
+ OSMetaClassDefineReservedUnused(IOService, 46);
+ OSMetaClassDefineReservedUnused(IOService, 47);
++
++
++/*
++ * Console bring-up helper: instantiate the prelinked ApplePMGRNub class and
++ * publish it, so AMFI's waitForMatchingService("ApplePMGRNub") succeeds.
++ * The nub's provider slot is cleared, which makes the original read stub
++ * return 0xffffffff and the write stub a no-op; AMFI's read/OR/write sequence
++ * then completes without touching PMGR hardware.
++ */
++extern "C" void
++sheng_pmgr_stub_publish(void)
++{
++	OSMetaClass *meta = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("ApplePMGRNub"));
++
++	if (meta == nullptr) {
++		kprintf("sheng-pmgr-stub: ApplePMGRNub class missing\n");
++		return;
++	}
++	IOService *nub = (IOService *)meta->alloc();
++	if (nub == nullptr) {
++		kprintf("sheng-pmgr-stub: alloc failed\n");
++		return;
++	}
++	/* Provider pointer used by the original nub read/write stubs. */
++	*(void **)((char *)nub + 0x440) = nullptr;
++	if (!nub->init()) {
++		kprintf("sheng-pmgr-stub: init failed\n");
++		nub->release();
++		return;
++	}
++	nub->registerService();
++	kprintf("sheng-pmgr-stub: ApplePMGRNub published\n");
++}

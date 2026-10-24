@@ -135,6 +135,11 @@ jobs:
           path: uefi
           persist-credentials: false
 
+      - name: Install the PMGR stub kernel patch
+        run: |
+          test -f self/patches/xnu/zzz-pmgr-stub.patch
+          cp self/patches/xnu/zzz-pmgr-stub.patch unixnu/patches/xnu/
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -205,6 +210,11 @@ jobs:
           ref: ${{ inputs.uefi_ref }}
           path: uefi
           persist-credentials: false
+
+      - name: Install the PMGR stub kernel patch
+        run: |
+          test -f self/patches/xnu/zzz-pmgr-stub.patch
+          cp self/patches/xnu/zzz-pmgr-stub.patch unixnu/patches/xnu/
 
       - uses: actions/setup-python@v5
         with:
