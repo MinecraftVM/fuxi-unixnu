@@ -222,6 +222,27 @@ FUXIRAMDISK: payload at 0x... (找到时)
 如果它和 `boot-uefi-hello-up.img` 表现一致，可以确认不是基线差异；如果只有它能进 hello 项，
 说明上游顺手修了别的东西。
 
+## 1i. 三段式搜索：`boot-uefi-hello-full.img`
+
+如果 hello 还是找不到，这张镜像会把所有**安全可达**的位置都试一遍（仍然只报告、不停机）：
+
+1. **`/chosen` `linux,initrd-start`**：ABL 如果按 Linux 惯例把 ramdisk 写进设备树，这里就是准确地址；
+2. **Kernel 窗口 `0xA8000000..0xB8000000`**：平台内存表里这块是 `SYS_MEM/Reserv`，已映射，读它不会 fault；
+3. **所有 Conventional/Loader/BootServices 描述符**（`LocatePayload()`）。
+
+屏幕日志：
+
+```
+FUXIRAMDISK: hint miss, trying /chosen and full scans
+FUXIRAMDISK: chosen initrd-start=0x...
+FUXIRAMDISK: scanning kernel window 0xa8000000..0xb8000000     ← 可能几秒
+FUXIRAMDISK: payload at 0x... in the kernel window             ← 命中时
+FUXIRAMDISK: conventional memory scan
+FUXIRAMDISK: payload at 0x... from the memory map
+```
+
+菜单里出现 **fuxi: UEFI hello (no XNU)** 就是找到了。哪怕没找到，`initrd-start` 的值也直接告诉我们 ABL 的想法。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；

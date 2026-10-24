@@ -469,6 +469,93 @@ def enable_dt_chosen(uefi: Path) -> None:
         print(f"{inf}: FdtLib added")
 
 
+
+def enable_ramdisk_full(uefi: Path) -> None:
+    """Try every safe place a payload volume can be before giving up.
+
+    Three staged attempts, each reported through DEBUG (framebuffer console):
+      1. /chosen linux,initrd-start from the device tree the previous stage left in x0;
+      2. the platform "Kernel" window 0xA8000000..0xB8000000 (Reserved SYS_MEM in the
+         board's own memory table, so reading it cannot fault);
+      3. every Conventional/Loader/BootServices descriptor (LocatePayload()).
+    This does not replace the SEC hint scan; it runs only when that found nothing.
+    """
+    package = uefi / "Platforms/Xiaomi/fuxiPkg"
+    source = package / "Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.c"
+    inf = package / "Drivers/FuxiRamDiskDxe/FuxiRamDiskDxe.inf"
+    text, crlf = read_text(source)
+    if "FUXIRAMDISK: hint miss, trying" in text:
+        print(f"{source}: full search already present")
+        return
+    for header in ("#include <Library/DebugLib.h>", "#include <Library/FdtLib.h>"):
+        if header not in text:
+            text = text.replace("#include <Uefi.h>\n", "#include <Uefi.h>\n" + header + "\n", 1)
+    block = r"""  if (mVolumeBase == NULL) {
+    EFI_PEI_HOB_POINTERS   Hob;
+    STATIC CONST EFI_GUID  EntryArgGuid = { 0xDAEE82E6, 0x8090, 0x4E72, { 0xBF, 0xB9, 0x78, 0xC1, 0x3C, 0xD4, 0xE3, 0x59 } };
+
+    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: hint miss, trying /chosen and full scans\n"));
+    Hob.Raw = GetHobList ();
+    while (!END_OF_HOB_LIST (Hob)) {
+      if ((Hob.Header->HobType == EFI_HOB_TYPE_GUID_EXTENSION) &&
+          (CompareGuid (&Hob.Guid->Name, &EntryArgGuid))) {
+        UINT64  Dt = *(UINT64 *)(Hob.Guid + 1);
+        if ((Dt != 0) && ((Dt & 3) == 0) && (FdtCheckHeader ((CONST VOID *)(UINTN)Dt) == 0)) {
+          INT32  Node = FdtPathOffset ((CONST VOID *)(UINTN)Dt, "/chosen");
+          if (Node >= 0) {
+            INT32        Len = 0;
+            CONST VOID   *Prop = FdtGetProp ((CONST VOID *)(UINTN)Dt, Node, "linux,initrd-start", &Len);
+            if (Prop != NULL) {
+              UINT64  Start = (Len >= 8) ? Fdt64ToCpu (*(CONST UINT64 *)Prop) : (UINT64)Fdt32ToCpu (*(CONST UINT32 *)Prop);
+              UINT64  Total = 0;
+              DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: chosen initrd-start=%lx\n", Start));
+              if (IsPayloadVolume ((UINT8 *)(UINTN)Start, &Total)) {
+                mVolumeBase  = (UINT8 *)(UINTN)Start;
+                mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at chosen initrd %lx\n", Start));
+              }
+            }
+          }
+        }
+      }
+      Hob.Raw = GET_NEXT_HOB (Hob);
+    }
+  }
+  if (mVolumeBase == NULL) {
+    UINT64  Probe;
+    UINT64  Total;
+    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: scanning kernel window 0xa8000000..0xb8000000\n"));
+    for (Probe = 0xA8000000ULL; Probe < 0xB8000000ULL; Probe += FUXI_BLOCK_SIZE) {
+      if (IsPayloadVolume ((UINT8 *)(UINTN)Probe, &Total)) {
+        mVolumeBase  = (UINT8 *)(UINTN)Probe;
+        mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+        DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx in the kernel window\n", Probe));
+        break;
+      }
+    }
+  }
+  if (mVolumeBase == NULL) {
+    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: conventional memory scan\n"));
+    if (LocatePayload ()) {
+      DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx from the memory map\n", (UINT64)(UINTN)mVolumeBase));
+    }
+  }
+  if (mVolumeBase == NULL) {"""
+    anchor = "  if (mVolumeBase == NULL) {"
+    if anchor not in text:
+        raise SystemExit(f"{source}: no-volume anchor missing")
+    text = text.replace(anchor, block, 1)
+    write_text(source, text, crlf)
+    print(f"{source}: full search inserted")
+
+    inf_text, inf_crlf = read_text(inf)
+    for lib in ("DebugLib", "FdtLib"):
+        if lib not in inf_text:
+            anchor = "[LibraryClasses]\n"
+            inf_text = inf_text.replace(anchor, anchor + "  " + lib + "\n", 1)
+    write_text(inf, inf_text, inf_crlf)
+
+
 def enable_debug_conout(uefi: Path) -> None:
     """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
 
@@ -546,6 +633,8 @@ def main() -> int:
                         help="print the large memory descriptors to the framebuffer console")
     parser.add_argument("--dtchosen", action="store_true",
                         help="print /chosen linux,initrd-start/end from the DT the ABL handed over in x0")
+    parser.add_argument("--ramdisk-full", action="store_true",
+                        help="after the hint misses, try /chosen, the kernel window and conventional memory")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -586,6 +675,8 @@ def main() -> int:
         enable_memmap_dump(Path(args.uefi))
     if args.dtchosen:
         enable_dt_chosen(Path(args.uefi))
+    if args.ramdisk_full:
+        enable_ramdisk_full(Path(args.uefi))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)
