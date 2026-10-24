@@ -1,0 +1,251 @@
+name: fuxi build
+
+# Builds the UniXNU boot image for the Xiaomi 13 (fuxi, SM8550) on a macOS
+# runner: the kernel, UniXNU, the Mu-Silicium firmware, the payload and finally
+# the boot image the stock ABL accepts.
+#
+# Two modes:
+#   uefi  firmware only. Fast, no Apple inputs. Boot it to see the UniXNU menu.
+#   full  also builds XNU from the IPSW and puts it in the payload ramdisk.
+#
+# The upstream pins below are the commits this workflow was written against.
+# Override them in the dispatch form once you carry your own fork or fixes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "uefi = firmware only; full = kernel + payload + boot image"
+        type: choice
+        options: [full, uefi]
+        default: full
+      chip_id:
+        description: "platform seed (16 hex digits, e.g. 0123456789abcdef); required by mode=full"
+        required: false
+        default: ""
+      defconfig:
+        description: "defconfig in the device repository"
+        required: true
+        default: fuxi_defconfig
+      unixnu_repo:
+        description: "UniXNU build driver repository"
+        default: UniXNU/UniXNU
+      unixnu_ref:
+        description: "UniXNU ref (commit, branch or tag)"
+        default: 1a01c2afa197d975d04da892325c56b6b14aaecb
+      device_repo:
+        description: "device repository"
+        default: hanzi123-bilp/unixnu-fuxi
+      device_ref:
+        description: "device repository ref"
+        default: d12c0585c7c82941c17e4af6bace12dc46953c85
+      uefi_repo:
+        description: "Mu-Silicium checkout with the fuxi package"
+        default: hanzi123-bilp/uefi-fuxi
+      uefi_ref:
+        description: "Mu-Silicium ref"
+        default: 37b367b75a7827c96d977f843aa7443fe023e066
+      fd_base:
+        description: "optional override of [uefi_fd] base (leave empty: 0xA7100000 as checked in)"
+        default: ""
+      fd_size:
+        description: "optional override of [uefi_fd] size (leave empty: 0x300000 as checked in)"
+        default: ""
+      extra_kernel_args:
+        description: "extra XNU boot arguments, space separated (optional)"
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuxi-${{ github.ref }}-${{ inputs.mode }}-${{ inputs.defconfig }}
+  cancel-in-progress: false
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  HOMEBREW_NO_ENV_HINTS: 1
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  UNIXNU_DEVICE: ${{ github.workspace }}/device
+  UNIXNU_UEFI: ${{ github.workspace }}/uefi
+  DEFCONFIG: ${{ inputs.defconfig }}
+  MODE: ${{ inputs.mode }}
+  FD_BASE: ${{ inputs.fd_base }}
+  FD_SIZE: ${{ inputs.fd_size }}
+  CHIP_ID: ${{ inputs.chip_id }}
+  EXTRA_ARGS: ${{ inputs.extra_kernel_args }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 350
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+        with:
+          path: self
+          persist-credentials: false
+
+      - name: Check out UniXNU
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.unixnu_repo }}
+          ref: ${{ inputs.unixnu_ref }}
+          path: unixnu
+          persist-credentials: false
+
+      - name: Check out the device repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.device_repo }}
+          ref: ${{ inputs.device_ref }}
+          path: device
+          persist-credentials: false
+
+      - name: Check out the Mu-Silicium firmware
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.uefi_repo }}
+          ref: ${{ inputs.uefi_ref }}
+          path: uefi
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install host tools
+        run: |
+          brew install llvm lld mtools dtc unifdef
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
+
+      - name: Report the toolchain
+        run: |
+          sw_vers
+          uname -m
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          clang --version | head -n 1
+          "$(brew --prefix llvm)/bin/clang" --version | head -n 1
+          python3 --version
+          for tool in clang llvm-objcopy llvm-nm ld.lld mformat mcopy unifdef; do
+            printf '%-12s %s\n' "$tool" "$(command -v "$tool" || echo MISSING)"
+          done
+          df -h "$GITHUB_WORKSPACE"
+
+      - name: Apply the fuxi build fixes
+        run: |
+          args=()
+          if [ -n "$FD_BASE" ] && [ -n "$FD_SIZE" ]; then
+            args+=(--fd-base "$FD_BASE" --fd-size "$FD_SIZE")
+          fi
+          python3 self/scripts/apply-fixes.py --uefi uefi --device device "${args[@]}"
+
+      - name: Select the device
+        run: |
+          cd unixnu
+          ./unixnu defconfig "$DEFCONFIG"
+          ./unixnu status
+
+      - name: Fetch the build sources
+        run: |
+          cd unixnu
+          ./unixnu fetch
+
+      - name: Fetch the IPSW components
+        if: inputs.mode == 'full'
+        run: |
+          cd unixnu
+          ./unixnu ipsw fetch
+
+      - name: Build the kernel
+        if: inputs.mode == 'full'
+        run: |
+          cd unixnu
+          ./unixnu build kernel
+
+      - name: Build the UniXNU package
+        run: |
+          cd unixnu
+          ./unixnu build package
+
+      - name: Build the firmware
+        run: |
+          cd unixnu
+          ./unixnu build firmware --uefi "$UNIXNU_UEFI"
+
+      - name: Build the payload
+        if: inputs.mode == 'full'
+        run: |
+          cd unixnu
+          if ! [[ "$CHIP_ID" =~ ^[0-9A-Fa-f]{1,16}$ ]]; then
+            echo "::error::mode=full needs chip_id: 1-16 hex digits for --unique-chip-id"
+            exit 1
+          fi
+          args=(--uefi "$UNIXNU_UEFI" --unique-chip-id "$CHIP_ID")
+          for argument in $EXTRA_ARGS; do args+=(--kernel-arg "$argument"); done
+          ./unixnu build payload "${args[@]}"
+
+      - name: Pack the boot image
+        run: |
+          mkdir -p out
+          fd="$UNIXNU_UEFI/Build/fuxiPkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd"
+          ramdisk=""
+          if [ "$MODE" = full ]; then ramdisk="$GITHUB_WORKSPACE/unixnu/out/fuxi/payload/payload.img"; fi
+          pack=(--uefi "$UNIXNU_UEFI" --fd "$fd" --dtb "$UNIXNU_UEFI/Resources/DTBs/fuxi.dtb"
+                --ramdisk "$ramdisk" --out "$GITHUB_WORKSPACE/out/boot.img")
+          if [ -n "$FD_BASE" ] && [ -n "$FD_SIZE" ]; then
+            pack+=(--fd-base "$FD_BASE" --fd-size "$FD_SIZE")
+          fi
+          python3 self/scripts/pack-bootimg-v3.py "${pack[@]}"
+          shasum -a 256 out/boot.img
+          cat out/boot.json
+
+      - name: Collect the build logs
+        if: always()
+        run: |
+          mkdir -p out/logs
+          cp unixnu/out/fuxi/logs/*.log out/logs/ 2>/dev/null || true
+          cp uefi/Build/fuxiPkg/DEBUG_CLANGPDB/Build.log out/logs/edk2-build.log 2>/dev/null || true
+          (cd unixnu && ./unixnu status) > out/logs/status.txt 2>&1 || true
+          ls -la out out/logs
+
+      - name: Upload the boot image
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuxi-${{ inputs.mode }}-boot-${{ github.run_number }}
+          path: |
+            out/boot.img
+            out/boot.json
+            out/logs/
+            unixnu/out/fuxi/payload/payload.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## fuxi build ($MODE)"
+            echo
+            echo "| Item | Value |"
+            echo "| --- | --- |"
+            echo "| defconfig | $DEFCONFIG |"
+            echo "| device | ${{ inputs.device_repo }}@${{ inputs.device_ref }} |"
+            echo "| uefi | ${{ inputs.uefi_repo }}@${{ inputs.uefi_ref }} |"
+            echo "| firmware base/size | ${FD_BASE:-$(sed -n 's/^base = //p' uefi/Resources/Configs/fuxi.toml | head -1)} / ${FD_SIZE:-$(sed -n 's/^size = //p' uefi/Resources/Configs/fuxi.toml | head -1)} |"
+            if [ -f out/boot.img ]; then
+              echo "| boot.img | $(stat -f%z out/boot.img) bytes, sha256 $(shasum -a 256 out/boot.img | cut -d' ' -f1) |"
+            else
+              echo "| boot.img | not produced |"
+            fi
+            echo
+            echo 'Download the artifact, then: `adb reboot bootloader` and `fastboot boot boot.img`.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,6 @@
+out/
+*.img
+*.fd
+*.json
+__pycache__/
+.scratch/
