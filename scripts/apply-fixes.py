@@ -39,6 +39,7 @@ TABLE = re.compile(r"^\[\[?\s*([^\]]+?)\s*\]\]?\s*(?:#.*)?$")
 KEY = re.compile(r"^(\s*)([A-Za-z_][\w-]*)(\s*)=.*$")
 
 CONSOLE_DEFCONFIG = "fuxi_console_defconfig"
+PROBE_INF = "fuxiPkg/Drivers/FuxiProbeDxe/FuxiProbeDxe.inf"
 CONSOLE_ARCHIVES = [
     "build-corecrypto-14.py",
     "build-corecrypto-14.py --namespace",
@@ -151,6 +152,40 @@ def set_archives(text: str, entries: list[str]) -> str:
     return "".join(out)
 
 
+def enable_probe(uefi: Path) -> None:
+    """Compile FuxiProbeDxe into the firmware volume (a separate, diagnostic image).
+
+    The driver is in the upstream tree but not referenced by fuxi.dsc/fuxi.fdf. It
+    clears the screen, prints the FUXIESP memory-map search result and halts, which
+    is the only on-screen diagnostic this board has without a UART.
+    """
+    package = uefi / "Platforms/Xiaomi/fuxiPkg"
+    dsc, fdf = package / "fuxi.dsc", package / "fuxi.fdf"
+    for path in (dsc, fdf):
+        if not path.is_file():
+            raise SystemExit(f"{path} not found: check --uefi")
+    text, crlf = read_text(dsc)
+    if PROBE_INF in text:
+        print(f"{dsc}: probe already present")
+    else:
+        anchor = "  fuxiPkg/Drivers/FuxiKeyInputDxe/FuxiKeyInputDxe.inf"
+        if anchor not in text:
+            raise SystemExit(f"{dsc}: the FuxiKeyInputDxe component anchor is gone")
+        write_text(dsc, text.replace(anchor, anchor + "\n  " + PROBE_INF + "\n"), crlf)
+        print(f"{dsc}: probe added to [Components]")
+    text, crlf = read_text(fdf)
+    if PROBE_INF in text:
+        print(f"{fdf}: probe already present")
+    else:
+        anchor = "  !include QcomPkg/Extra.fdf.inc"
+        if anchor not in text:
+            raise SystemExit(f"{fdf}: the QcomPkg include anchor is gone")
+        block = ("  # Bring-up diagnostic: print the FUXIESP search result and halt.\n"
+                 f"  INF {PROBE_INF}\n\n")
+        write_text(fdf, text.replace(anchor, block + anchor), crlf)
+        print(f"{fdf}: probe added to FvMain")
+
+
 def check_settings(path: Path, text: str) -> None:
     """Report the two build-visible settings instead of silently trusting them."""
     if path.name.endswith(".toml") and "header_version" in text:
@@ -187,6 +222,8 @@ def main() -> int:
     parser.add_argument("--fd-size", default="", help="override [uefi_fd] size (opt-in; default: leave the file alone)")
     parser.add_argument("--console", action="store_true",
                         help="select the experimental console-only defconfig and archive list")
+    parser.add_argument("--probe", action="store_true",
+                        help="compile the FuxiProbeDxe bring-up diagnostic into the firmware volume")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -214,6 +251,9 @@ def main() -> int:
         rewrite(board, before, board_text, f"{board} edits", board_crlf)
     else:
         print(f"{board}: already applied")
+
+    if args.probe:
+        enable_probe(Path(args.uefi))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)

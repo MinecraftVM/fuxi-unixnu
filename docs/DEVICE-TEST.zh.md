@@ -55,6 +55,30 @@ UniXNU 读到 `unixnu.toml` → 真的启动一个 EFI 应用。
 fastboot boot boot-uefi-hello.img
 ```
 
+## 1c. 诊断镜像：带 FUXIPROBE（默认镜像黑屏时用）
+
+本地产物：`out/boot-uefi-probe.img`（1.85 MB，不含 payload）。
+
+它在固件卷里多编进了一个上游自带、但默认没启用的驱动 `FuxiProbeDxe`。开机后它清屏并打印：
+
+```
+FUXIPROBE: walking the memory map for FUXIESP
+FUXIPROBE: hit at 0x... label=FUXIESP type=...
+```
+
+它只扫描 UEFI 内存映射里属于普通 RAM 的区间（不去碰未映射的 MMIO），命中的地址就是 payload
+FAT 卷在内存里的位置；最后故意 `CpuDeadLoop()` 停住。
+
+| 屏幕现象 | 含义 |
+| --- | --- |
+| 有 `FUXIPROBE:` 文字 | 固件、GOP、ConOut 至少到了能打印的阶段 |
+| 有文字、`no FUXIESP volume ...` | 控制台正常，但 ramdisk 没进内存（BootShim/SEC/ramdisk 定位） |
+| 有文字、有 `hit` | payload 卷在内存里，问题在 FAT/UniXNU 的发现逻辑 |
+| 仍然黑屏并卡住 | 控制台没起来或更早就挂了；长按电源 |
+
+它**不会继续启动**，看到结果后长按电源即可。复现方法见
+[BUILD-LOCAL.zh.md](BUILD-LOCAL.zh.md) 的“诊断固件”一节（`apply-fixes.py --probe`）。
+
 ## 2. 测试 B：full 镜像（带 XNU）
 
 1. 先在 GitHub Actions 跑 `mode=full`（`chip_id` 用 `openssl rand -hex 8` 生成）；

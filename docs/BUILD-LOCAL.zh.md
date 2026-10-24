@@ -105,6 +105,22 @@ $PY fuxi-unixnu/scripts/pack-bootimg-v3.py \
 脚本会编译 BootShim、校验 ARM64 header、gzip、调用上游
 `uefi-fuxi/tools/mkbootimg_v3.py` 打包，再逐段回读校验。
 
+### 可选：诊断固件（带 FUXIPROBE）
+
+默认镜像黑屏时，把上游自带但没启用的 `FuxiProbeDxe` 编进固件，让它在屏幕上报告 payload 搜索：
+
+```sh
+$PY fuxi-unixnu/scripts/apply-fixes.py --uefi uefi-fuxi --device unixnu-fuxi --probe
+$PY ./unixnu build firmware --uefi ../uefi-fuxi
+$PY fuxi-unixnu/scripts/pack-bootimg-v3.py --uefi uefi-fuxi \
+  --fd uefi-fuxi/Build/fuxiPkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd \
+  --dtb uefi-fuxi/Resources/DTBs/fuxi.dtb --out out/boot-uefi-probe.img
+git -C uefi-fuxi checkout -- Platforms/Xiaomi/fuxiPkg   # 还原固件源码
+```
+
+`--probe` 是幂等的：它把 `FuxiProbeDxe.inf` 加进 `fuxi.dsc` 的 `[Components]` 和
+`fuxi.fdf` 的 `FvMain`（放在控制台驱动之后），再跑一次不会重复添加。
+
 ## 5. QEMU 冒烟测试（本机已跑通）
 
 不接手机也能验证「UniXNU.efi + FAT payload + 配置 + 菜单 + 启动 EFI 应用」这条链。
