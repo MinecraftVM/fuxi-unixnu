@@ -2,7 +2,8 @@
 
 把 [UniXNU](https://github.com/UniXNU/UniXNU)（在非 Apple ARM64 硬件上通过 UEFI 跑 Darwin/XNU）
 搬到小米 13（fuxi，SM8550）。这个仓库不重复写驱动，它把**上游已有的 fuxi 半成品**固定版本、
-修掉两处会直接导致开不了机的配置错误，然后用一条 macOS Actions 流水线把 **boot.img** 做出来。
+修掉构建链上会让你卡住的坑（重复的 splash 节点、v3 打包、FD 布局说明），
+然后用一条 macOS Actions 流水线把 **boot.img** 做出来。
 
 ## 现在的真实进度
 
@@ -18,7 +19,7 @@
 
 这个仓库负责：
 
-1. **修两处会直接导致黑屏/无法启动的配置错误**（见“为什么要打补丁”）；
+1. **修掉构建链上的坑**（见“构建时的修正”）：默认只删掉重复的 splash 节点，不擅自改上游实测过的固件布局；
 2. **一条能跑完整条链的 macOS Actions 构建**：内核 → UniXNU → 固件 → payload → boot.img；
 3. 用 fuxi 自己的 v3 打包器生成**原厂 ABL 能接受的 boot 镜像**（`unixnu bootimg` 只能出 v0）；
 4. 中文的部署、验证、排障、回滚步骤（[`docs/DEPLOY.zh.md`](docs/DEPLOY.zh.md)）。
