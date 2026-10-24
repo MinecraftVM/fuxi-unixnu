@@ -532,3 +532,17 @@ FUXIRAMDISK: anchor +1D48BB9: FCC08ED8 BE0100B9 00BF7C00 EAA5F380
 
 若 lz42 的 anchor 出现 `02214c18`（LZ4 magic），说明 ABL **拷贝了压缩数据但不解压**——
 那样就在固件里加一个 LZ4 block 解码器，把 payload 解到内存再挂载。
+## 1o. LZ4 帧真机日志（2026-10-24）
+
+```
+FUXIRAMDISK: probe v2, label scan B6272000..B7FFE40F (1D8C40F bytes)
+FUXIRAMDISK: anchor +0: 184C2102 00280F50 303730E0 30313037
+FUXIRAMDISK: anchor +1D48BB9: 7C00BE01 F38000BF 0072EA5 01B80800
+```
+
+- 范围长度比 vendor ramdisk 多 `0x43856 = 276,566` 字节，正好是 LZ4 帧大小；
+- 但帧应有的位置（`Start+0x1D48BB9` / 尾部对齐）都不是 `18 4C 21 02`。
+
+结论：ABL 按 ramdisk 大小扩展了 initrd 范围，但**没有把我们的数据写进去**（或写到了固件看不到的位置）。
+结合固件里没有 UFS/Scsi 块设备驱动，剩余可行通道只有 **kernel 字段**（gzip 版 `kdtb2`、
+非压缩版 `rawk`）和 **DTB 内嵌**（把 payload 放进 FDT 的 totalsize 内）。
