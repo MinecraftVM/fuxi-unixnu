@@ -34,9 +34,9 @@
 +			bool sheng_pmgr_attached = (sheng_pmgr_platform != nullptr) && nub->attach(sheng_pmgr_platform);
 +			bool sheng_pmgr_reg = sheng_pmgr_attached && nub->registerService();
 +			bool sheng_pmgr_started = sheng_pmgr_reg && nub->start(sheng_pmgr_platform);
-+			OSPtr<OSDictionary> sheng_pmgr_match = IOService::serviceMatching("ApplePMGRNub");
-+			OSPtr<IOService> sheng_pmgr_found = IOService::waitForMatchingService(sheng_pmgr_match.get(), 100000000ULL);
-+			panic("SHENG-PMGR-STUB: late, attached=%d reg=%d started=%d found=%d", sheng_pmgr_attached, sheng_pmgr_reg, sheng_pmgr_started, sheng_pmgr_found.get() != nullptr);
++			if (!sheng_pmgr_started) {
++				panic("SHENG-PMGR-STUB: late, start failed (attached=%d reg=%d)", sheng_pmgr_attached, sheng_pmgr_reg);
++			}
 +		}
 +	}
  	IOService::publishResource("IOBSD");
