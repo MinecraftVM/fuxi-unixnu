@@ -72,6 +72,7 @@
    | config | `upstream`（默认）或 `console`（实验：绕开需要 prelink 候选的归档） |
    | chip_id | `full` 必填，16 位十六进制：`openssl rand -hex 8` |
    | xcode | 留空用 runner 默认；需要时填 `/Applications` 下的版本号 |
+   | ramdisk_format | `raw`（默认）/ `lz4` / `gzip`；ABL 只拷贝压缩 ramdisk 时选 `lz4` |
    | 其他 | 保持默认（上游按 commit 固定） |
 
 3. 工作流会先跑一个 **Ubuntu 预检**（配置修正 + IPSW kernelcache pin 校验 + defconfig 守卫检查 + 设备选择），

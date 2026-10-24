@@ -184,6 +184,8 @@ def main():
     parser.add_argument("--ramdisk", default="", help="UniXNU payload image; omitted means an empty ramdisk")
     parser.add_argument("--gzip-ramdisk", action="store_true",
                         help="gzip the ramdisk first; some bootloaders only decompress a compressed ramdisk")
+    parser.add_argument("--lz4-ramdisk", action="store_true",
+                        help="compress the ramdisk with legacy lz4 (lz4 -l) before packing")
     parser.add_argument("--payload-after-dtb", action="store_true",
                         help="append the payload after the device tree inside the kernel field "
                              "(when the bootloader ignores the ramdisk field)")
@@ -214,6 +216,21 @@ def main():
         ramdisk = gzip.compress(ramdisk, compresslevel=9, mtime=0)
         ramdisk_kind = f"{ramdisk_kind}, gzipped {raw_size} -> {len(ramdisk)} bytes"
         print(f"gzip ramdisk: {raw_size} -> {len(ramdisk)} bytes")
+    if ramdisk and args.lz4_ramdisk:
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="fuxi-lz4-") as work:
+            plain = Path(work) / "ramdisk.bin"
+            packed = Path(work) / "ramdisk.lz4"
+            plain.write_bytes(ramdisk)
+            result = subprocess.run(["lz4", "-l", "-9", "-f", str(plain), str(packed)],
+                                    capture_output=True, text=True)
+            if result.returncode:
+                raise PackError(f"lz4 failed: {result.stderr.strip() or result.stdout.strip()}")
+            raw_size = len(ramdisk)
+            ramdisk = packed.read_bytes()
+            ramdisk_kind = f"{ramdisk_kind}, lz4 {raw_size} -> {len(ramdisk)} bytes"
+            print(f"lz4 ramdisk: {raw_size} -> {len(ramdisk)} bytes")
     if ramdisk and not ramdisk_kind.startswith("FAT"):
         print(f"warning: the ramdisk is {ramdisk_kind}; UniXNU expects its FAT payload volume here")
 
@@ -224,8 +241,8 @@ def main():
         gzip_path = Path(scratch) / "kernel.gz"
         gzip_path.write_bytes(gzip_stream)
         ramdisk_path = args.ramdisk
-        if ramdisk and args.gzip_ramdisk:
-            ramdisk_path = str(Path(scratch) / "ramdisk.gz")
+        if ramdisk and (args.gzip_ramdisk or args.lz4_ramdisk):
+            ramdisk_path = str(Path(scratch) / "ramdisk.compressed")
             Path(ramdisk_path).write_bytes(ramdisk)
         if args.payload_after_dtb:
             kernel_with_payload = Path(scratch) / "kernel-with-payload.bin"
@@ -245,6 +262,7 @@ def main():
         "fd_sha256": sha256(firmware), "image_sha256": sha256(Path(args.out).read_bytes()),
         "ramdisk_kind": ramdisk_kind,
         "ramdisk_gzip": bool(args.gzip_ramdisk),
+        "ramdisk_lz4": bool(args.lz4_ramdisk),
         "payload_after_dtb": bool(args.payload_after_dtb),
         "config": args.config, "packer": pack_output,
     })
