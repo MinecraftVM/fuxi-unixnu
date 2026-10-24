@@ -913,6 +913,43 @@ def set_min_payload(uefi: Path, mib: int) -> None:
     print(f"{source}: minimum payload lowered to {mib} MiB")
 
 
+def enable_lz4_payload(uefi: Path) -> None:
+    """Decode a legacy-LZ4 ramdisk the bootloader copied without expanding."""
+    package = uefi / "Platforms/Xiaomi/fuxiPkg"
+    driver_dir = package / "Drivers/FuxiRamDiskDxe"
+    source = driver_dir / "FuxiRamDiskDxe.c"
+    inf = driver_dir / "FuxiRamDiskDxe.inf"
+    helper = driver_dir / "Lz4Legacy.c"
+    text, crlf = read_text(source)
+    if "Lz4FindPayload" in text:
+        print(f"{source}: lz4 payload search already present")
+        return
+    newline = chr(10)
+    overrides = Path(__file__).resolve().parents[1] / "overrides"
+    helper.write_text((overrides / "Lz4Legacy.c").read_text())
+    print(f"{helper}: decoder copied")
+
+    inf_text, inf_crlf = read_text(inf)
+    if "Lz4Legacy.c" not in inf_text:
+        inf_text = inf_text.replace("FuxiRamDiskDxe.c", "FuxiRamDiskDxe.c" + newline + "  Lz4Legacy.c", 1)
+        write_text(inf, inf_text, inf_crlf)
+        print(f"{inf}: Lz4Legacy.c added to [Sources]")
+
+    extern = "extern UINT8 *Lz4FindPayload (CONST UINT8 *Range, UINTN Length, UINTN *Bytes, BOOLEAN (*IsVolume)(CONST UINT8 *, UINT64 *));" + newline + newline
+    anchor = "STATIC EFI_BLOCK_IO_MEDIA     mMedia;"
+    if anchor not in text:
+        raise SystemExit(f"{source}: media anchor missing")
+    text = text.replace(anchor, extern + anchor, 1)
+
+    snippet = (overrides / "lz4_call.inc").read_text()
+    length_anchor = "                UINT64  Length  = End - Start;" + newline
+    if length_anchor not in text:
+        raise SystemExit(f"{source}: length anchor missing")
+    text = text.replace(length_anchor, length_anchor + snippet, 1)
+    write_text(source, text, crlf)
+    print(f"{source}: lz4 search inserted")
+
+
 def enable_debug_conout(uefi: Path) -> None:
     """Route EDK II DEBUG output to ConOut so the screen shows the boot log.
 
@@ -1000,6 +1037,8 @@ def main() -> int:
                         help="rewrite [payload] size_mib (a bootloader may cap the ramdisk)")
     parser.add_argument("--min-payload-mib", type=int, default=0,
                         help="lower IsPayloadVolume's size floor (bring-up test with a small volume)")
+    parser.add_argument("--lz4-payload", action="store_true",
+                        help="decompress a legacy-LZ4 ramdisk the bootloader copied without expanding")
     args = parser.parse_args()
 
     uefi_config = Path(args.uefi) / "Resources" / "Configs" / f"{args.config}.toml"
@@ -1048,6 +1087,8 @@ def main() -> int:
         set_payload_size(Path(args.device), args.payload_size)
     if args.min_payload_mib:
         set_min_payload(Path(args.uefi), args.min_payload_mib)
+    if args.lz4_payload:
+        enable_lz4_payload(Path(args.uefi))
 
     final_config, _ = read_text(uefi_config)
     base = re.search(r"^base\s*=\s*(0x[0-9A-Fa-f]+)", final_config, re.M)
