@@ -1,38 +1,37 @@
---- a/iokit/bsddev/IOKitBSDInit.cpp
-+++ b/iokit/bsddev/IOKitBSDInit.cpp
-@@ -35,6 +35,9 @@
- #include <IOKit/IOPlatformExpert.h>
- #include <IOKit/IOUserClient.h>
- #include <libkern/c++/OSAllocation.h>
-+#include <libkern/c++/OSSymbol.h>
+--- a/iokit/Kernel/IOStartIOKit.cpp
++++ b/iokit/Kernel/IOStartIOKit.cpp
+@@ -67,6 +67,8 @@
+ SECURITY_READ_ONLY_LATE(static IOPlatformExpertDevice*) gRootNub;
+ 
+ #include <kern/clock.h>
 +#include <kern/debug.h>
 +extern "C" kern_return_t OSKextLoadKextWithIdentifier(const char *identifier);
+ #include <sys/time.h>
  
- extern "C" {
- #include <libkern/amfi/amfi.h>
-@@ -110,6 +113,25 @@
- kern_return_t
- IOKitBSDInit( void )
- {
+ void
+@@ -104,6 +106,25 @@
+ 	IOCatalogue::initialize();
+ 	IOStatistics::initialize();
+ 	OSKext::initialize();
 +	{
 +		int sheng_pmgr_stub = 0;
 +		if (PE_parse_boot_argn("sheng-pmgr-stub", &sheng_pmgr_stub, sizeof(sheng_pmgr_stub)) && sheng_pmgr_stub) {
 +			kern_return_t sheng_pmgr_load = OSKextLoadKextWithIdentifier("com.apple.driver.ApplePMGR");
 +			const OSMetaClass *meta = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("ApplePMGRNub"));
 +			if (meta == nullptr) {
-+				panic("SHENG-PMGR-STUB: late hook, ApplePMGRNub class missing (load=%d)", sheng_pmgr_load);
++				panic("SHENG-PMGR-STUB: iokit init, ApplePMGRNub class missing (load=%d)", sheng_pmgr_load);
 +			}
 +			IOService *nub = (IOService *)meta->alloc();
 +			if (nub == nullptr) {
-+				panic("SHENG-PMGR-STUB: late hook, alloc failed");
++				panic("SHENG-PMGR-STUB: iokit init, alloc failed");
 +			}
 +			*(void **)(uintptr_t)((char *)nub + 0x440) = nullptr;
 +			if (!nub->init()) {
-+				panic("SHENG-PMGR-STUB: late hook, init failed");
++				panic("SHENG-PMGR-STUB: iokit init, init failed");
 +			}
 +			nub->registerService();
 +		}
 +	}
- 	IOService::publishResource("IOBSD");
- 
- #if IOPOLLED_COREFILE
+ 	IOUserClient::initialize();
+ 	IOMemoryDescriptor::initialize();
+ 	IORootParent::initialize();
