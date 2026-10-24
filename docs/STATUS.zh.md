@@ -12,7 +12,7 @@ XNU 内核只剩 macOS 编译这一步，其余环节都已在 Linux 上验证�
 | DEBUG 上屏（FrameBufferSerialPortLib） | ✅ | `SEC: ...`、`Loading driver ...` 等 |
 | DXE 驱动枚举 | ✅ | 55 个内存描述符、FuxiKeyInputDxe/Smbios/UniXNUDxe 依次加载 |
 | UniXNU 应用程序 | ✅ | 菜单显示，含 Restart / Power off |
-| payload 卷发现 | ⏳ | 旧扫描窗口没命中；新镜像用 `/chosen initrd` + Kernel 窗口 |
+| payload 卷发现 | ⏳ | 上游 `a7f42bfc` 新增“提示下方 128 MiB”有界扫描；新镜像再用 `/chosen` + Kernel 窗口兜底 |
 | XNU 内核 | ⏳ | 需要 macOS 编译 |
 
 ## 2. 真机内存布局（从屏幕日志读到）

@@ -183,6 +183,7 @@ FUXIRAMDISK: payload at 0x... (找到时)
 
 | 镜像 | 固件里的扫描方向 |
 | --- | --- |
+| `boot-uefi-hello-latest.img` | 上游 a7f42bfc（提示下方 128 MiB）+ 我们的 /chosen/Kernel 窗口兜底 |
 | `boot-uefi-hello-down.img` | 上游的向下 256 MiB |
 | `boot-uefi-hello-up.img` | 向上 16 MiB（DT/ramdisk 在 kernel 字段之后） |
 

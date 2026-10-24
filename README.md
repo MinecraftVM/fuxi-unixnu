@@ -139,7 +139,7 @@ scripts/verify-ipsw.py             Linux 上核对 IPSW 身份与 kernelcache pi
 | --- | --- |
 | UniXNU/UniXNU | `1a01c2afa197d975d04da892325c56b6b14aaecb` |
 | hanzi123-bilp/unixnu-fuxi | `d12c0585c7c82941c17e4af6bace12dc46953c85` |
-| hanzi123-bilp/uefi-fuxi | `c15fe3523477445dafeb62c557fb9758d80d1c52` |
+| hanzi123-bilp/uefi-fuxi | `a7f42bfc27dc33fa2ebf3c99752f2cd75a1def34` |
 
 上游还在高频推进；要跟新版在 Run workflow 里改 `*_ref` 即可（可能会和补丁冲突，日志里能看到）。
 
