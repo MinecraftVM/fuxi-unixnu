@@ -1,5 +1,19 @@
 # 上机测试协议与数据采集
 
+## 0. 先看这里：现在该试哪张镜像
+
+| 目的 | 镜像 | 预期 |
+| --- | --- | --- |
+| **payload 发现（当前最需要）** | `boot-uefi-hello-dt.img` | 菜单出现 **fuxi: UEFI hello (no XNU)** |
+| 如果上一步黑屏/停住 | `boot-uefi-diag.img` | `FUXIDT:` / `FUXIMAP:` / `FUXIRAMDISK:` 三组日志 |
+| 只想确认固件 + 界面 | `boot-uefi-diskdbg.img` | 菜单里 Restart / Power off |
+| 界面也没有、要查 GOP | `boot-uefi-probe.img` | `FUXIPROBE: GOP Success/Not Found` 后停机 |
+
+其余镜像（`boot-uefi-only`、`hello-up/down/new/full/latest`、`diskup`、`debugcon`）是
+排查过程中的中间产物，保留但已被上表取代。
+
+
+
 这份文档解决两件事：**每次上机怎么测、测完要给我什么**；以及**哪些数据只能从你的手机上取**，
 取到之后我可以把 board.toml 里的值改准（尤其是 userdata 的 LBA 和固件卷窗口）。
 

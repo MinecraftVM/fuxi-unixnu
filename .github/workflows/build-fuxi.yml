@@ -221,6 +221,15 @@ jobs:
           for tool in llvm-objcopy llvm-nm; do
             printf '%-12s %s\n' "$tool" "$(brew --prefix llvm)/bin/$tool"
           done
+          # The kernel step needs these; fail here instead of 40 minutes into the build.
+          missing=0
+          for tool in cmake ninja xcodebuild unifdef clang git make; do
+            if ! command -v "$tool" >/dev/null; then
+              echo "::error::::$tool is missing on the runner"
+              missing=1
+            fi
+          done
+          exit "$missing"
           df -h "$GITHUB_WORKSPACE"
 
       - name: Apply the fuxi build fixes
