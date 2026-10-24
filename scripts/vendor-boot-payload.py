@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 MAGIC = b"VNDRBOOT"
-V4_FIELDS = 2176  # header bytes through bootconfig_size
+V4_FIELDS = 2128  # header bytes through bootconfig_size
 
 
 def parse(data: bytes) -> dict:
@@ -28,8 +28,8 @@ def parse(data: bytes) -> dict:
         raise SystemExit("not a vendor_boot v4 image (magic VNDRBOOT missing)")
     version, page_size, kernel_addr, ramdisk_addr, ramdisk_size = struct.unpack_from("<5I", data, 8)
     tags_addr = struct.unpack_from("<I", data, 2076)[0]
-    header_size, dtb_size = struct.unpack_from("<2I", data, 2144)
-    table_size, entry_num, entry_size, bootconfig_size = struct.unpack_from("<4I", data, 2160)
+    header_size, dtb_size = struct.unpack_from("<2I", data, 2096)
+    table_size, entry_num, entry_size, bootconfig_size = struct.unpack_from("<4I", data, 2112)
     if version < 4:
         raise SystemExit(f"header version {version}: only v4 carries the table and bootconfig")
     return {
@@ -94,6 +94,11 @@ def main() -> int:
 
     payload = Path(args.payload).read_bytes()
     ramdisk = parts["ramdisk"] + payload
+    table = bytearray(parts["table"])
+    if len(table) >= 12:
+        # The table tells the bootloader which ramdisk ranges to load; extend entry 0
+        # so the appended payload is part of the platform fragment.
+        struct.pack_into("<I", table, 0, len(ramdisk))
     page = info["page_size"]
 
     def pad(blob: bytes) -> bytes:
@@ -101,11 +106,11 @@ def main() -> int:
 
     header = bytearray(data[: (info["header_size"] + page - 1) // page * page])
     struct.pack_into("<I", header, 24, len(ramdisk))
-    struct.pack_into("<2I", header, 2144, info["header_size"], len(parts["dtb"]))
-    struct.pack_into("<4I", header, 2160, len(parts["table"]), info["table_entries"],
+    struct.pack_into("<2I", header, 2096, info["header_size"], len(parts["dtb"]))
+    struct.pack_into("<4I", header, 2112, len(table), info["table_entries"],
                      info["table_entry_size"], len(parts["bootconfig"]))
     out = bytes(header) + pad(ramdisk) + parts["dtb"]
-    out += b"\x00" * ((-len(out)) % page) + parts["table"]
+    out += b"\x00" * ((-len(out)) % page) + bytes(table)
     out += b"\x00" * ((-len(out)) % page) + parts["bootconfig"]
     Path(args.out).write_bytes(out)
     print(f"wrote {args.out}: ramdisk {len(parts['ramdisk'])} -> {len(ramdisk)} bytes, total {len(out)}")
