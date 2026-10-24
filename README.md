@@ -145,6 +145,7 @@ scripts/diagnose-logs.py           失败日志归类（library not found / prel
 scripts/qemu-smoke.sh              QEMU/AAVMF 冒烟测试（已验证 UniXNU + payload 链路）
 scripts/verify-ipsw.py             Linux 上核对 IPSW 身份与 kernelcache pin（自建 LZFSE 解码）
 scripts/check-defconfig.py         在 macOS 之前检查 defconfig 是否满足 XNU 构建脚本的硬性要求
+scripts/assemble-full.sh           kernel.macho → payload → 固件 → boot.img 一条命令
 ```
 
 ## 上游版本固定

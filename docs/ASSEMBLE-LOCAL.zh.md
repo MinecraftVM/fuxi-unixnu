@@ -4,6 +4,17 @@
 工作流的 **`mode=kernel`** 只跑内核并上传 `kernel/`；把它拿回来就能在 Linux 上
 把 boot.img 组装出来，省下大部分 macOS runner 时间。
 
+## 0. 一条命令（推荐）
+
+```sh
+bash fuxi-unixnu/scripts/assemble-full.sh --kernel /path/to/kernel.macho --chip-id <16 位十六进制>
+```
+
+脚本会依次完成：payload（ADT + FAT + panic 屏）→ 编固件（如果还没有 FD）→ 打包 boot.img，
+最后打印 sha256。需要 `python3 ≥ 3.11`、`mtools`、`ld.lld`/`llvm-nm` 在 PATH 上。
+
+下面是拆开的分步命令。
+
 ## 1. 在 Actions 上只编内核
 
 Run workflow：
