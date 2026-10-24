@@ -100,3 +100,24 @@ boot.img 带同样的发现逻辑。
 2. 下载 `kernel/` → 按 ASSEMBLE-LOCAL 本地组装 `boot.img`；
 3. 真机先跑 `boot-uefi-hello-dt.img` 确认 payload；再 `fastboot boot` 带内核的镜像；
 4. 看到 DarwinBoot 交接即里程碑；后续接显示/触控/存储驱动再逐项推进。
+## 7. 备选：改 vendor_boot 携带 payload（有风险）
+
+六种 `fastboot boot` 传输全部失败后，剩下的可行路径是**把 payload 追加到 vendor_boot 的 ramdisk**：
+
+```sh
+# 1) 分析官方镜像（只读）
+python3 scripts/vendor-boot-payload.py analyze vendor_boot.img
+# 2) 追加 payload（4 MiB 或 64 MiB 的 FAT 均可）
+python3 scripts/vendor-boot-payload.py add-payload vendor_boot.img payload.img -o vendor_boot-patched.img
+# 3) 刷入（务必保留官方镜像用于回滚）
+fastboot flash vendor_boot vendor_boot-patched.img
+# 4) 照常 fastboot boot 我们的固件，initrd 尾部会带 payload
+fastboot boot out/flash-kit/boot-uefi-hello-gz3.img
+```
+
+- ABL 会把 vendor ramdisk 放进 `/chosen` 指向的 initrd；
+- 固件的字节级标签扫描能在 initrd 范围内找到追加的 FAT；
+- 内核的 initramfs 解包器会在压缩流结束时停止，尾部的 FAT 不会影响 Android；
+- **回滚**：`fastboot flash vendor_boot 官方镜像`。
+
+工具在合成 v4 镜像上验证过：头部字段、页对齐、ramdisk 追加、dtb/bootconfig 重排都正确。
