@@ -531,6 +531,7 @@ def enable_ramdisk_full(uefi: Path) -> None:
                 Anchors[3] = (End > 0x43856ULL) ? (End - 0x43856ULL) : 0;
                 Anchors[4] = (End > 0x1000ULL) ? (End - 0x1000ULL) : 0;
                 DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: probe v2, label scan %lx..%lx (%lx bytes)\n", Start, End, Length));
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: hint=%016lx base_gt_4g=%d\n", mHintValue, (mHintValue >= 0x100000000ULL) ? 1 : 0));
                 for (Anchor = 0; Anchor < 5; Anchor++) {
                   if ((Anchors[Anchor] >= Start) && (Anchors[Anchor] + 16 <= End)) {
                     UINT32  *W = (UINT32 *)(UINTN)Anchors[Anchor];
