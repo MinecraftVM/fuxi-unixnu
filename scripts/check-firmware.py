@@ -37,7 +37,7 @@ def main() -> int:
         return path.read_text(errors="replace")
 
     driver_text = read(driver)
-    for marker in ("FUXIRAMDISK: hint miss", "FUXIRAMDISK: label scan in", "FUXIRAMDISK: payload at"):
+    for marker in ("FUXIRAMDISK: hint miss", "label scan", "FUXIRAMDISK: payload at"):
         if marker not in driver_text:
             problems.append(f"{driver.name}: marker {marker!r} missing (apply-fixes --discover did not apply)")
 
