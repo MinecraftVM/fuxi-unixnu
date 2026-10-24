@@ -716,6 +716,60 @@ def enable_ramdisk_full(uefi: Path) -> None:
     }
   }
   if (mVolumeBase == NULL) {
+    EFI_STATUS             MapStatus;
+    UINTN                  MapSize = 0;
+    UINTN                  MapKey;
+    UINTN                  DescSize;
+    UINT32                 DescVersion;
+    EFI_MEMORY_DESCRIPTOR  *Map;
+    MapStatus = gBS->GetMemoryMap (&MapSize, NULL, &MapKey, &DescSize, &DescVersion);
+    MapSize += 64 * DescSize;
+    Map = AllocatePool (MapSize);
+    if (Map != NULL) {
+      MapStatus = gBS->GetMemoryMap (&MapSize, Map, &MapKey, &DescSize, &DescVersion);
+      if (!EFI_ERROR (MapStatus)) {
+        UINTN   Index;
+        UINT64  Scanned = 0;
+        for (Index = 0; (Index < MapSize / DescSize) && (mVolumeBase == NULL); Index++) {
+          EFI_MEMORY_DESCRIPTOR  *Desc = (EFI_MEMORY_DESCRIPTOR *)((UINT8 *)Map + Index * DescSize);
+          UINT64                 RegionStart = Desc->PhysicalStart;
+          UINT64                 RegionEnd   = RegionStart + (Desc->NumberOfPages << 12);
+          if ((RegionStart < 0x40000000ULL) || (RegionStart >= 0xD0000000ULL)) {
+            continue;
+          }
+          if (Desc->NumberOfPages < ((4ULL * 1024 * 1024) >> 12)) {
+            continue;
+          }
+          if (Scanned >= 0x80000000ULL) {
+            break;
+          }
+          DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: fdt scan %lx..%lx\n", RegionStart, RegionEnd));
+          {
+            UINT64  Probe;
+            for (Probe = RegionStart; Probe + FUXI_BLOCK_SIZE <= RegionEnd; Probe += FUXI_BLOCK_SIZE) {
+              if (SwapBytes32 (*(UINT32 *)(UINTN)Probe) == 0xD00DFEED) {
+                UINT32  Size = SwapBytes32 (*(UINT32 *)(UINTN)(Probe + 4));
+                if ((Size > 0x1000) && (Size < 0x400000)) {
+                  UINT64  After = Probe + Size;
+                  UINT64  Total = 0;
+                  DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: fdt at %lx size=%x\n", Probe, Size));
+                  if (IsPayloadVolume ((UINT8 *)(UINTN)After, &Total)) {
+                    DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx after the fdt %lx\n", After, Probe));
+                    mVolumeBase  = (UINT8 *)(UINTN)After;
+                    mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          Scanned += (RegionEnd - RegionStart);
+        }
+      }
+      FreePool (Map);
+    }
+  }
+  if (mVolumeBase == NULL) {
     DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: conventional memory scan\n"));
     if (LocatePayload ()) {
       DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx from the memory map\n", (UINT64)(UINTN)mVolumeBase));
