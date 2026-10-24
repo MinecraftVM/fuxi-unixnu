@@ -35,7 +35,8 @@ fastboot boot boot-uefi-only.img
 
 ## 1b. 测试 A2：UEFI + hello payload（不需要内核）
 
-本地产物：`out/boot-uefi-hello.img`（68.9 MB，ramdisk 64 MiB）。
+本地产物：`out/boot-uefi-hello.img`（203 MB，ramdisk 192 MiB —— 和真实 XNU payload 同尺寸，
+所以 fastboot/ABL 的尺寸行为也一并验证了）。
 里面是一个 FAT 卷：
 
 ```
