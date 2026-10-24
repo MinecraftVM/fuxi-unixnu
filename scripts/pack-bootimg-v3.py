@@ -187,7 +187,6 @@ def main():
     ramdisk = Path(args.ramdisk).read_bytes() if args.ramdisk else b""
     ramdisk_kind = describe_ramdisk(ramdisk)
     if ramdisk and args.gzip_ramdisk:
-        import gzip
         raw_size = len(ramdisk)
         ramdisk = gzip.compress(ramdisk, compresslevel=9, mtime=0)
         ramdisk_kind = f"{ramdisk_kind}, gzipped {raw_size} -> {len(ramdisk)} bytes"

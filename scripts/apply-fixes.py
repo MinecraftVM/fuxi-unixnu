@@ -633,6 +633,56 @@ def enable_ramdisk_full(uefi: Path) -> None:
     }
   }
   if (mVolumeBase == NULL) {
+    EFI_STATUS             MapStatus;
+    UINTN                  MapSize = 0;
+    UINTN                  MapKey;
+    UINTN                  DescSize;
+    UINT32                 DescVersion;
+    EFI_MEMORY_DESCRIPTOR  *Map;
+    MapStatus = gBS->GetMemoryMap (&MapSize, NULL, &MapKey, &DescSize, &DescVersion);
+    MapSize += 64 * DescSize;
+    Map = AllocatePool (MapSize);
+    if (Map != NULL) {
+      MapStatus = gBS->GetMemoryMap (&MapSize, Map, &MapKey, &DescSize, &DescVersion);
+      if (!EFI_ERROR (MapStatus)) {
+        UINTN   Index;
+        UINT64  Scanned = 0;
+        for (Index = 0; (Index < MapSize / DescSize) && (mVolumeBase == NULL); Index++) {
+          EFI_MEMORY_DESCRIPTOR  *Desc = (EFI_MEMORY_DESCRIPTOR *)((UINT8 *)Map + Index * DescSize);
+          UINT64                 RegionStart = Desc->PhysicalStart;
+          UINT64                 RegionEnd   = RegionStart + (Desc->NumberOfPages << 12);
+          if (RegionStart < 0x80000000ULL) {
+            continue;
+          }
+          if (RegionStart >= 0xD0000000ULL) {
+            continue;
+          }
+          if (Desc->NumberOfPages < ((64ULL * 1024 * 1024) >> 12)) {
+            continue;
+          }
+          if (Scanned >= 0x80000000ULL) {
+            break;
+          }
+          DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: scanning %lx..%lx type=%u\n", RegionStart, RegionEnd, Desc->Type));
+          {
+            UINT64  Probe;
+            UINT64  Total = 0;
+            for (Probe = RegionStart; Probe + FUXI_BLOCK_SIZE <= RegionEnd; Probe += FUXI_BLOCK_SIZE) {
+              if (IsPayloadVolume ((UINT8 *)(UINTN)Probe, &Total)) {
+                DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx in %lx..%lx\n", Probe, RegionStart, RegionEnd));
+                mVolumeBase  = (UINT8 *)(UINTN)Probe;
+                mVolumeBytes = (UINTN)(Total * FUXI_BLOCK_SIZE);
+                break;
+              }
+            }
+          }
+          Scanned += (RegionEnd - RegionStart);
+        }
+      }
+      FreePool (Map);
+    }
+  }
+  if (mVolumeBase == NULL) {
     DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: conventional memory scan\n"));
     if (LocatePayload ()) {
       DEBUG ((DEBUG_ERROR, "FUXIRAMDISK: payload at %lx from the memory map\n", (UINT64)(UINTN)mVolumeBase));
