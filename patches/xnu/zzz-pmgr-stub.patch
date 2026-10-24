@@ -1,37 +1,41 @@
---- a/iokit/Kernel/IOStartIOKit.cpp
-+++ b/iokit/Kernel/IOStartIOKit.cpp
-@@ -67,6 +67,8 @@
- SECURITY_READ_ONLY_LATE(static IOPlatformExpertDevice*) gRootNub;
- 
- #include <kern/clock.h>
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -35,6 +35,9 @@
+ #include <IOKit/IOPlatformExpert.h>
+ #include <IOKit/IOUserClient.h>
+ #include <libkern/c++/OSAllocation.h>
++#include <libkern/c++/OSSymbol.h>
 +#include <kern/debug.h>
 +extern "C" kern_return_t OSKextLoadKextWithIdentifier(const char *identifier);
- #include <sys/time.h>
  
- void
-@@ -104,6 +106,25 @@
- 	IOCatalogue::initialize();
- 	IOStatistics::initialize();
- 	OSKext::initialize();
+ extern "C" {
+ #include <libkern/amfi/amfi.h>
+@@ -110,6 +113,28 @@
+ kern_return_t
+ IOKitBSDInit( void )
+ {
 +	{
 +		int sheng_pmgr_stub = 0;
 +		if (PE_parse_boot_argn("sheng-pmgr-stub", &sheng_pmgr_stub, sizeof(sheng_pmgr_stub)) && sheng_pmgr_stub) {
 +			kern_return_t sheng_pmgr_load = OSKextLoadKextWithIdentifier("com.apple.driver.ApplePMGR");
 +			const OSMetaClass *meta = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("ApplePMGRNub"));
 +			if (meta == nullptr) {
-+				panic("SHENG-PMGR-STUB: iokit init, ApplePMGRNub class missing (load=%d)", sheng_pmgr_load);
++				panic("SHENG-PMGR-STUB: late, class missing (load=%d)", sheng_pmgr_load);
 +			}
 +			IOService *nub = (IOService *)meta->alloc();
 +			if (nub == nullptr) {
-+				panic("SHENG-PMGR-STUB: iokit init, alloc failed");
++				panic("SHENG-PMGR-STUB: late, alloc failed");
 +			}
 +			*(void **)(uintptr_t)((char *)nub + 0x440) = nullptr;
 +			if (!nub->init()) {
-+				panic("SHENG-PMGR-STUB: iokit init, init failed");
++				panic("SHENG-PMGR-STUB: late, init failed");
 +			}
-+			nub->registerService();
++			bool sheng_pmgr_registered = nub->registerService();
++			mach_timespec_t sheng_pmgr_timeout = { 2, 0 };
++			IOService *sheng_pmgr_found = IOService::waitForService(IOService::serviceMatching("ApplePMGRNub"), &sheng_pmgr_timeout);
++			panic("SHENG-PMGR-STUB: late, load=%d registered=%d found=%d", sheng_pmgr_load, sheng_pmgr_registered, sheng_pmgr_found != nullptr);
 +		}
 +	}
- 	IOUserClient::initialize();
- 	IOMemoryDescriptor::initialize();
- 	IORootParent::initialize();
+ 	IOService::publishResource("IOBSD");
+ 
+ #if IOPOLLED_COREFILE
