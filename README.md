@@ -34,6 +34,8 @@
 | 真实的 192 MiB payload FAT 镜像能被发现/启动 | ✅ 实测 | `scripts/qemu-smoke.sh --payload-image` |
 | UniXNU 界面在小米 13 上显示 | ✅ 真机反馈（2026-10-24） | "能进unixnu界面" |
 | payload 的 ADT 生成与结构 | ✅ 实测 | 13496 字节，节点与 chip-id/unique-chip-id 已核对 |
+| IPSW 身份 + kernelcache sha256 固定值 | ✅ 实测 | `scripts/verify-ipsw.py`：`f18b4df…` 与 board.toml 一致 |
+| trust cache bundle 的两个 pin | ⏳ 需要设备 `static-trustcache.bin` | 原始成员哈希不等于 bundle 哈希 |
 | fuxi 真机固件 | ⏳ 待你测 | `boot-uefi-only.img` |
 | macOS 上编 XNU 内核 | ⏳ 待 Actions | workflow `mode=full` |
 
@@ -124,6 +126,7 @@ scripts/gpt-userdata.py            从 GPT 转储读 userdata 的 LBA（board.to
 scripts/blob-scan.py               从 xbl_config 转储核对固件卷窗口（[uefi_fd]）
 scripts/diagnose-logs.py           失败日志归类（library not found / prelink / 工具缺失…）
 scripts/qemu-smoke.sh              QEMU/AAVMF 冒烟测试（已验证 UniXNU + payload 链路）
+scripts/verify-ipsw.py             Linux 上核对 IPSW 身份与 kernelcache pin（自建 LZFSE 解码）
 ```
 
 ## 上游版本固定

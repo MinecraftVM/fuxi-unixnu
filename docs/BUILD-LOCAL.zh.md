@@ -135,6 +135,28 @@ git -C uefi-fuxi checkout -- Platforms/Xiaomi/fuxiPkg
 它只覆盖 DXE 阶段的 `DebugLib`（`[LibraryClasses.common.DXE_CORE]` 和 `.DXE_DRIVER`），
 SEC 保留串口库，否则 EDK II 会拒绝构建（`UefiDebugLibConOut` 不支持 SEC 模块类型）。
 
+## 4b. 验证 IPSW 输入（不需要 Mac）
+
+内核步骤会用 `/usr/bin/compression_tool` 解 LZFSE 并核对 `kernelcache_sha256`。
+Linux 上可以用 lzfse 参考实现做同样的事：
+
+```sh
+git clone --depth 1 https://github.com/lzfse/lzfse
+gcc -O2 -o lzfse_dec lzfse/src/*.c
+$PY fuxi-unixnu/scripts/verify-ipsw.py --unixnu UniXNU --device unixnu-fuxi --lzfse ./lzfse_dec
+```
+
+实测输出（2026-10-24）：
+
+```
+kernelcache: 46415872 bytes, mach-o cffaedfe, sha256 f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7
+kernelcache pin: OK
+```
+
+顺带会打印两个原始 trust cache 成员的 sha256。注意它们**不是** `[payload] trust_cache_sha256`
+里的值：那两个 pin 是 `scripts/build-original-system-trust.py` 把两段模块拼成的 bundle 的哈希，
+而这个脚本还需要设备自己的 `static-trustcache.bin`。所以 trust cache 这一项要等真实设备输入。
+
 ## 5. QEMU 冒烟测试（本机已跑通）
 
 不接手机也能验证「UniXNU.efi + FAT payload + 配置 + 菜单 + 启动 EFI 应用」这条链。
