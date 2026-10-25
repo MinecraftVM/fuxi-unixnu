@@ -58,17 +58,7 @@ jobs:
           cd unixnu
           python3 ./unixnu fetch -D ../device
 
-      - name: Package the fetched feeds
-        run: |
-          tar -C unixnu/out -czf feeds.tar.gz feeds
-          ls -lh feeds.tar.gz
 
-      - name: Upload the feeds
-        uses: actions/upload-artifact@v4
-        with:
-          name: unixnu-feeds
-          path: feeds.tar.gz
-          retention-days: 3
 
       - name: Show the resolved status
         run: |
