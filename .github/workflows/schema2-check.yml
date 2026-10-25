@@ -33,6 +33,14 @@ jobs:
           git add -A
           git -c user.name=ci -c user.email=ci@localhost commit -qm 'fuxi schema-2 device repository'
 
+      - name: Pin the SM8550 SoC source
+        run: |
+          sha=$(git ls-remote https://github.com/UniXNU/UniXNU-sm8550-common refs/heads/main | cut -f1)
+          echo "sm8550 main commit: $sha"
+          test -n "$sha"
+          sed -i "s|ref = "main"|commit = "$sha"|" device/feeds.toml
+          grep -A2 'name = "sm8550"' device/feeds.toml
+
       - name: Select the configuration
         run: |
           cd unixnu
