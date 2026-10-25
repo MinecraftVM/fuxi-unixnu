@@ -4,3 +4,4 @@ out/
 *.json
 __pycache__/
 .scratch/
+prelink-candidate/
