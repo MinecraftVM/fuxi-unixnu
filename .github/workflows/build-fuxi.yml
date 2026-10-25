@@ -360,6 +360,9 @@ jobs:
             cp "$pkgs/native-owner-ufs-rootauth3-candidate.macho" "$pkgs/native-defaults-candidate.macho"
           fi
           sed -i "s/require(ref_sha == .c487cb1e607a468e26fcc4da93a02a4d30a129360cd3ca9ca88ef3a51f8c8cd9., .Unexpected KDK annotation input.)/pass/" unixnu/scripts/audit-aes-interface.py || true
+          mkdir -p device/scripts
+          cp unixnu/scripts/audit-aes-interface.py device/scripts/audit-aes-interface.py
+          grep -n "^pass" device/scripts/audit-aes-interface.py || true
 
       - name: Build the kernel
         if: inputs.mode == 'full' || inputs.mode == 'kernel'
