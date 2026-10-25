@@ -102,6 +102,7 @@ jobs:
           cd unixnu
           python3 ./unixnu build kernel -D ../device 2>&1 | tail -100
 
+      - name: Upload the report
         uses: actions/upload-artifact@v4
         with:
           name: schema2-report
