@@ -89,7 +89,19 @@ jobs:
             ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree/kits 2>/dev/null
           } | tee report.txt
 
-      - name: Upload the report
+      - name: Show the resolved archives
+        run: |
+          python3 - <<'PY'
+          import json
+          d = json.load(open('status.json'))
+          print(json.dumps(d['board']['kernel'].get('archives'), indent=1))
+          PY
+
+      - name: Build the kernel
+        run: |
+          cd unixnu
+          python3 ./unixnu build kernel -D ../device 2>&1 | tail -100
+
         uses: actions/upload-artifact@v4
         with:
           name: schema2-report

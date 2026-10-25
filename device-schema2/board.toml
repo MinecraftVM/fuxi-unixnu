@@ -10,7 +10,7 @@ description = "Xiaomi 13 (fuxi), SM8550, iPadOS 17.7.11 root"
 kit = "sheng"
 
 [components]
-include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "DarwinBoot"]
+include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "DarwinBoot", "ShengUfs", "GopFramebuffer"]
 
 [kernel]
 defconfig = "fuxi_defconfig"
@@ -131,6 +131,7 @@ trust_cache_sha256 = [
   "8900d6a93d7a59ce1a872a5c081e559f4240a218f97e12d44d22dda46644d68f",
 ]
 kernel_args = [
+  "native-ufs-root=1",
   "sheng-pmgr-stub=1",
   "amfi_get_out_of_my_way=1",
   "-v",
