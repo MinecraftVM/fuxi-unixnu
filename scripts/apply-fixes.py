@@ -1001,6 +1001,8 @@ def enable_full_ufs(board: Path, device: Path, text: str) -> str:
     shutil.copyfile(template, configs / FULL_UFS_DEFCONFIG)
     wrapper = Path(__file__).resolve().parents[1] / "overrides" / "full-ufs-audit-aes.py"
     shutil.copyfile(wrapper, device / "scripts" / "full-ufs-audit-aes.py")
+    wrapper2 = Path(__file__).resolve().parents[1] / "overrides" / "full-ufs-audit-storage.py"
+    shutil.copyfile(wrapper2, device / "scripts" / "full-ufs-audit-storage.py")
     print(f"full-ufs: wrote {configs / FULL_UFS_DEFCONFIG}")
     text = set_key(text, "kernel", "defconfig", f'"{FULL_UFS_DEFCONFIG}"')
     text = set_archives(text, FULL_UFS_ARCHIVES)
