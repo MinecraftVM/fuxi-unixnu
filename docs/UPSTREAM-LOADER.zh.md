@@ -1,6 +1,7 @@
 # 用上游 loader 启动 iOS（fuxi 实测流程，2026-10-25）
 
-结果：**苹果 logo + 进度条跑完**，随后黑屏（显示/GPU 交付未接通）。
+结果：**苹果 logo + 进度条跑完**，随后内核 console 显示系统运行日志（launchd 已拉起 xpcproxy、
+bluetoothd、fairplayd、triald、role 等守护进程）。显示仍未交接到 SpringBoard。
 整条链路已在小米 13（fuxi, SM8550）上验证。
 
 ## 组成
@@ -83,3 +84,26 @@ dyld: (共享缓存映射成功)
 ```
 ... fuxigpu=1 fuxigpuabi=1 fuxiprivs=1 fuxisbpath=1 ...
 ```
+## 实测：用户态已完整运行（2026-10-25）
+
+```
+SWEET MRS: triald ...
+exec xpcproxy
+exec launchd
+exec bluetoothd
+exec fairplayd
+exec xpcrole
+```
+
+- launchd 持续拉起守护进程，系统处于运行状态；
+- 屏幕显示的是**内核 console**，不是 SpringBoard 的 UI；
+- 下一步是显示/GPU 交付：SpringBoard 需要拿到 framebuffer/GPU 合成通路
+  （上游 `docs-lanes/gpu.md`、`touch-display.md`、`sys-port.md`）。
+
+### 可选 boot-arg（尚未验证生效）
+
+```
+fuxigpu=1 fuxigpuabi=1 fuxigpulevel=4 fuxiprivs=1 fuxisbpath=1 sweetfb_noconsole=1
+```
+
+`sweetfb_noconsole=1` 让内核 console 不再占用 framebuffer，可能是 UI 出现的先决条件。
