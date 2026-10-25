@@ -59,6 +59,8 @@ FULL_UFS_ARCHIVES = [
     "build-arm-driver.py NativeUfs",
     "build-arm-driver.py NativeAES",
     "build-arm-driver.py NativeVirtioBlock",
+    "build-arm-driver.py NativeAdreno",
+    "build-native-adreno-kits.py",
     "full-ufs-audit-aes.py",
     "audit-storage-interface.py",
     "build-native-virtio-bindings.py",
