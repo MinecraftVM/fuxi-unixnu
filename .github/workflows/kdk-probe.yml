@@ -1,0 +1,21 @@
+name: KDK probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sha:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Hash the AES kext on this runner
+        run: |
+          set -u
+          f=/System/Library/Extensions/IOCryptoAcceleratorFamily.kext/Contents/MacOS/IOCryptoAcceleratorFamily
+          echo "runner=${{ matrix.os }}"
+          sw_vers || true
+          ls -l "$f" || true
+          shasum -a 256 "$f" || true
