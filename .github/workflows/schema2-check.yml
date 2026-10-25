@@ -38,7 +38,14 @@ jobs:
           sha=$(git ls-remote https://github.com/UniXNU/UniXNU-sm8550-common refs/heads/main | cut -f1)
           echo "sm8550 main commit: $sha"
           test -n "$sha"
-          sed -i "s|ref = "main"|commit = "$sha"|" device/feeds.toml
+          python3 - "$sha" <<'PY'
+          import pathlib, sys
+          sha = sys.argv[1]
+          p = pathlib.Path('device/feeds.toml')
+          text = p.read_text().replace('ref = "main"', f'commit = "{sha}"')
+          p.write_text(text)
+          print(text)
+          PY
           grep -A2 'name = "sm8550"' device/feeds.toml
 
       - name: Select the configuration
