@@ -60,7 +60,7 @@ FULL_UFS_ARCHIVES = [
     "build-arm-driver.py NativeAES",
     "build-arm-driver.py NativeVirtioBlock",
     "full-ufs-audit-aes.py",
-    "audit-storage-interface.py",
+    "full-ufs-audit-storage.py",
     "build-native-virtio-bindings.py",
     "build-verified-root-probe.py --component os",
     "build-boot-progress.py",
