@@ -50,6 +50,22 @@ CONSOLE_ARCHIVES = [
 ]
 
 
+FULL_UFS_DEFCONFIG = "fuxi_full_ufs_defconfig"
+FULL_UFS_ARCHIVES = [
+    "build-corecrypto-14.py",
+    "build-corecrypto-14.py --namespace",
+    "build-arm-driver.py ArmDTPlatform",
+    "build-arm-driver.py ArmCpu",
+    "build-arm-driver.py NativeUfs",
+    "build-arm-driver.py NativeVirtioBlock",
+    "build-native-virtio-bindings.py",
+    "build-verified-root-probe.py --component os",
+    "build-boot-progress.py",
+    "build-libpthread-kernel.py",
+    "build-legacy-stub.py",
+]
+
+
 def read_text(path: Path) -> tuple[str, bool]:
     """Read UTF-8 text and report whether the file uses CRLF, so writing keeps it."""
     raw = path.read_bytes().decode("utf-8")
@@ -971,6 +987,22 @@ def enable_lz4_payload(uefi: Path) -> None:
     print(f"{source}: lz4 search inserted")
 
 
+def enable_full_ufs(board: Path, device: Path, text: str) -> str:
+    """Install the experimental full UFS/verified-root defconfig and select it."""
+    template = Path(__file__).resolve().parents[1] / "overrides" / FULL_UFS_DEFCONFIG
+    if not template.is_file():
+        raise SystemExit(f"{template} missing: this script is not running from the repository")
+    configs = device / "configs"
+    if not configs.is_dir():
+        raise SystemExit(f"{configs} missing: is --device a unixnu device repository?")
+    shutil.copyfile(template, configs / FULL_UFS_DEFCONFIG)
+    print(f"full-ufs: wrote {configs / FULL_UFS_DEFCONFIG}")
+    text = set_key(text, "kernel", "defconfig", f'"{FULL_UFS_DEFCONFIG}"')
+    text = set_archives(text, FULL_UFS_ARCHIVES)
+    print(f"full-ufs: [kernel] defconfig = {FULL_UFS_DEFCONFIG}, {len(FULL_UFS_ARCHIVES)} archives")
+    return text
+
+
 def enable_sheng_pmgr(device: Path) -> None:
     """Turn on sheng-pmgr=2 and let the PMGR archive build without a prelink candidate."""
     board = device / "board.toml"
@@ -1052,6 +1084,8 @@ def main() -> int:
     parser.add_argument("--config", default="fuxi", help="device config name (default: fuxi)")
     parser.add_argument("--fd-base", default="", help="override [uefi_fd] base (opt-in; default: leave the file alone)")
     parser.add_argument("--fd-size", default="", help="override [uefi_fd] size (opt-in; default: leave the file alone)")
+    parser.add_argument("--full-ufs", action="store_true",
+                        help="select the experimental full UFS/verified-root defconfig")
     parser.add_argument("--console", action="store_true",
                         help="select the experimental console-only defconfig and archive list")
     parser.add_argument("--probe", action="store_true",
@@ -1101,6 +1135,8 @@ def main() -> int:
         board_text = drop_table(board_text, "bootimg.dtb_node")
     if args.console:
         board_text = enable_console(board, device, board_text)
+    if getattr(args, "full_ufs", False):
+        board_text = enable_full_ufs(board, device, board_text)
     if board_text != before:
         rewrite(board, before, board_text, f"{board} edits", board_crlf)
     else:

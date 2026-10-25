@@ -1,0 +1,22 @@
+# Experimental full UFS / verified-root stack for the UniXNU kernel.
+# Needs a seeded prelink closure (build/native-prelink/*-candidate.macho + .json).
+
+CONFIG_XNU_SOURCE_CORECRYPTO14=y
+CONFIG_XNU_SOURCE_PTHREAD=y
+CONFIG_XNU_ARM_DT_PLATFORM=y
+CONFIG_XNU_ARMCPU=y
+CONFIG_XNU_NATIVE_AES=y
+CONFIG_XNU_NATIVE_UFS=y
+CONFIG_XNU_NATIVE_VIRTIO_BLOCK=y
+CONFIG_XNU_VERIFIED_ROOT_PROBE=y
+CONFIG_XNU_OWNER_ROOT_AUDIT=y
+CONFIG_XNU_BOOT_PROGRESS=y
+CONFIG_XNU_TRUST_CACHE_RUNTIME=y
+CONFIG_XNU_DT_PANIC_REGION=y
+CONFIG_XNU_NATIVE_ARCH_TIMER=y
+CONFIG_XNU_NATIVE_PAN=y
+
+CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"
+CONFIG_XNU_VERIFIED_ROOT_ARCHIVE="{tree}/build/verified-root-os-xnu-bundle/libVerifiedRootProbe.a"
+CONFIG_XNU_NATIVE_VIRTIO_BLOCK_ARCHIVE="{tree}/build/native-virtio-block-verified-bundle/libNativeVirtioBlock.a"
+CONFIG_XNU_EXTRA_LD_ARCHIVES="{tree}/build/legacy-stub/libLegacyStub.a"

@@ -26,7 +26,7 @@ on:
       config:
         description: "console = source-only archives (a fresh build must use this); upstream needs a pre-seeded prelink closure"
         type: choice
-        options: [console, upstream]
+        options: [console, upstream, full-ufs]
         default: console
       chip_id:
         description: "platform seed (16 hex digits, e.g. 0123456789abcdef); required by mode=full"
@@ -68,6 +68,14 @@ on:
         type: choice
         options: [raw, lz4, gzip]
         default: raw
+      candidate_macho_url:
+        description: "prelink candidate (kernel.macho) URL, full-ufs only"
+        required: false
+        default: ""
+      candidate_json_url:
+        description: "prelink candidate plan (kernel.json) URL, full-ufs only"
+        required: false
+        default: ""
       pre_build:
         description: "optional shell commands before the kernel build (bootstrap candidates, prelink fixtures)"
         required: false
@@ -168,7 +176,11 @@ jobs:
         run: |
           defconfig="$DEFCONFIG_INPUT"
           if [ -z "$defconfig" ]; then
-            if [ "$CONFIG_MODE" = console ]; then defconfig=fuxi_console_defconfig; else defconfig=fuxi_defconfig; fi
+            case "$CONFIG_MODE" in
+              console) defconfig=fuxi_console_defconfig ;;
+              full-ufs) defconfig=fuxi_full_ufs_defconfig ;;
+              *) defconfig=fuxi_defconfig ;;
+            esac
           fi
           python3 self/scripts/check-firmware.py --uefi uefi --device device
           python3 self/scripts/check-defconfig.py --device device --config "device/configs/$defconfig"
@@ -271,6 +283,10 @@ jobs:
             args+=(--console)
             echo "experimental console configuration: source-only archives, no NativeAES/BootProgress/UFS"
           fi
+          if [ "$CONFIG_MODE" = full-ufs ]; then
+            args+=(--full-ufs)
+            echo "experimental full UFS/verified-root configuration"
+          fi
           if [ "$MODE" = full ]; then
             # The ABL only made room for 64 MiB of boot-image ramdisk on fuxi.
             args+=(--payload-size 64)
@@ -283,7 +299,11 @@ jobs:
         run: |
           defconfig="$DEFCONFIG_INPUT"
           if [ -z "$defconfig" ]; then
-            if [ "$CONFIG_MODE" = console ]; then defconfig=fuxi_console_defconfig; else defconfig=fuxi_defconfig; fi
+            case "$CONFIG_MODE" in
+              console) defconfig=fuxi_console_defconfig ;;
+              full-ufs) defconfig=fuxi_full_ufs_defconfig ;;
+              *) defconfig=fuxi_defconfig ;;
+            esac
           fi
           echo "defconfig=$defconfig" >> "$GITHUB_OUTPUT"
           cd unixnu
@@ -309,6 +329,16 @@ jobs:
         run: |
           cd unixnu
           bash -euo pipefail -c "$PRE_BUILD"
+
+      - name: Seed the prelink closure
+        if: inputs.config == 'full-ufs' && inputs.candidate_macho_url != '' && inputs.candidate_json_url != ''
+        run: |
+          set -eu
+          pkgs=unixnu/out/fuxi/tree/build/native-prelink
+          mkdir -p "$pkgs"
+          curl -fL --retry 3 -o "$pkgs/native-owner-ufs-rootauth3-candidate.macho" "${{ inputs.candidate_macho_url }}"
+          curl -fL --retry 3 -o "$pkgs/native-owner-ufs-rootauth3-candidate.json" "${{ inputs.candidate_json_url }}"
+          ls -l "$pkgs"
 
       - name: Build the kernel
         if: inputs.mode == 'full' || inputs.mode == 'kernel'
