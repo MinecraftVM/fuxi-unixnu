@@ -97,6 +97,11 @@ jobs:
           print(json.dumps(d['board']['kernel'].get('archives'), indent=1))
           PY
 
+      - name: Install the Linux kernel toolchain
+        run: |
+          cd unixnu
+          sudo python3 scripts/linux/setup-toolchain.py
+
       - name: Build the kernel
         run: |
           cd unixnu
