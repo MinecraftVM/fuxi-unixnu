@@ -72,15 +72,22 @@ jobs:
 
       - name: Report the component catalog
         run: |
-          echo '--- feeds dirs'
-          ls unixnu/out/feeds 2>/dev/null | head -40
-          echo '--- component configs'
-          find unixnu/out/feeds -maxdepth 2 -name 'component.toml' 2>/dev/null | head -20
-          echo '--- unixnu feeds.toml'
-          head -60 unixnu/feeds.toml
-          echo '--- output dir'
-          ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi 2>/dev/null
-          echo '--- tree top'
-          ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree 2>/dev/null | head -30
-          echo '--- tree components'
-          ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree/components 2>/dev/null | head -30
+          {
+            echo '--- feeds dirs'
+            ls unixnu/out/feeds 2>/dev/null | head -40
+            echo '--- feeds.toml'
+            head -80 unixnu/feeds.toml
+            echo '--- soc.toml'
+            head -40 unixnu/out/feeds/UniXNU-sm8550-common-*/soc.toml
+            echo '--- tree top'
+            ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree 2>/dev/null | head -30
+            echo '--- tree components'
+            ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree/components 2>/dev/null | head -30
+          } | tee report.txt
+
+      - name: Upload the report
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema2-report
+          path: report.txt
+          retention-days: 7
