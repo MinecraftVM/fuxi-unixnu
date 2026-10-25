@@ -59,7 +59,7 @@ FULL_UFS_ARCHIVES = [
     "build-arm-driver.py NativeUfs",
     "build-arm-driver.py NativeAES",
     "build-arm-driver.py NativeVirtioBlock",
-    "audit-aes-interface.py",
+    "full-ufs-audit-aes.py",
     "audit-storage-interface.py",
     "build-native-virtio-bindings.py",
     "build-verified-root-probe.py --component os",
@@ -999,6 +999,8 @@ def enable_full_ufs(board: Path, device: Path, text: str) -> str:
     if not configs.is_dir():
         raise SystemExit(f"{configs} missing: is --device a unixnu device repository?")
     shutil.copyfile(template, configs / FULL_UFS_DEFCONFIG)
+    wrapper = Path(__file__).resolve().parents[1] / "overrides" / "full-ufs-audit-aes.py"
+    shutil.copyfile(wrapper, device / "scripts" / "full-ufs-audit-aes.py")
     print(f"full-ufs: wrote {configs / FULL_UFS_DEFCONFIG}")
     text = set_key(text, "kernel", "defconfig", f'"{FULL_UFS_DEFCONFIG}"')
     text = set_archives(text, FULL_UFS_ARCHIVES)
