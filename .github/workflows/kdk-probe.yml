@@ -11,11 +11,18 @@ jobs:
         os: [macos-14, macos-15, macos-26]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Hash the AES kext on this runner
+      - name: Locate the AES kext and hash it
         run: |
           set -u
-          f=/System/Library/Extensions/IOCryptoAcceleratorFamily.kext/Contents/MacOS/IOCryptoAcceleratorFamily
           echo "runner=${{ matrix.os }}"
           sw_vers || true
-          ls -l "$f" || true
-          shasum -a 256 "$f" || true
+          echo '--- installed KDKs'
+          ls -l /Library/Developer/KDKs 2>/dev/null || echo 'no /Library/Developer/KDKs'
+          echo '--- search'
+          for f in /Library/Developer/KDKs/*.kdk/System/Library/Extensions/IOCryptoAcceleratorFamily.kext/Contents/MacOS/IOCryptoAcceleratorFamily \
+                   /System/Library/Extensions/IOCryptoAcceleratorFamily.kext/Contents/MacOS/IOCryptoAcceleratorFamily; do
+            if [ -f "$f" ]; then
+              echo "found $f"
+              shasum -a 256 "$f"
+            fi
+          done
