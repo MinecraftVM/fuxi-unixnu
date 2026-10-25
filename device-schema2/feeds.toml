@@ -1,18 +1,11 @@
-# Extra sources this device repository needs on top of UniXNU's own feeds.toml.
+# Sources this device repository needs on top of UniXNU's own feeds.toml.
 #
-# audit-storage-interface.py reads refer/IOStorageFamily to build
-# build/storage-abi/{interface-audit.json,include/IOKit/storage/...}, which
-# build-arm-driver.py NativeUfs and build-native-virtio-bindings.py both need.
-# UniXNU's feeds.toml does not declare it, so `unixnu fetch` never creates that
-# tree and the archive step dies with:
-#     fatal: cannot change to '.../tree/refer/IOStorageFamily'
-#
-# Tag pinned to the revision audit-storage-interface.py asserts; the audit only needs the
-# IOBlockStorageDevice interface description, not an exact Darwin 23 match.
+# SM8550 shared support: SoC hardware description (DTSI), config fragment and
+# XNU patch series. Pinned when the schema-2 port is reviewed; the first
+# resolution records the fetched commit in unixnu.lock.
 
 [[source]]
-name = "IOStorageFamily"
-kind = "refer"
-git = "https://github.com/apple-oss-distributions/IOStorageFamily.git"
-ref = "IOStorageFamily-315"
-commit = "e45fbe30a7879e0b16e26dddb78538f1b00e0bff"
+name = "sm8550"
+kind = "soc"
+git = "https://github.com/UniXNU/UniXNU-sm8550-common"
+ref = "main"
