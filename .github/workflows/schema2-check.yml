@@ -116,11 +116,22 @@ jobs:
           print(json.dumps(d['board']['kernel'].get('archives'), indent=1))
           PY
 
-      - name: Install unifdef
+      - name: Build the Linux kernel toolchain
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends unifdef
-          unifdef -V 2>&1 | head -1 || true
+          cd unixnu
+          sudo python3 scripts/linux/setup-toolchain.py /opt/unixnu-linux
+
+      - name: Package the toolchain
+        run: |
+          tar -C /opt -czf unixnu-linux.tar.gz unixnu-linux
+          ls -lh unixnu-linux.tar.gz
+
+      - name: Upload the toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: unixnu-toolchain
+          path: unixnu-linux.tar.gz
+          retention-days: 7
 
       - name: Build the kernel
         run: |
