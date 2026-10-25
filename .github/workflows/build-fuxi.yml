@@ -340,8 +340,8 @@ jobs:
           macho_url="${{ inputs.candidate_macho_url }}"
           json_url="${{ inputs.candidate_json_url }}"
           if [ -n "$macho_url" ] && [ -n "$json_url" ]; then
-            curl -fL --retry 3 -o "$pkgs/native-owner-ufs-rootauth3-candidate.macho" "$macho_url"
-            curl -fL --retry 3 -o "$pkgs/native-owner-ufs-rootauth3-candidate.json" "$json_url"
+            curl -fL --retry 3 -H "Authorization: Bearer ${{ github.token }}" -o "$pkgs/native-owner-ufs-rootauth3-candidate.macho" "$macho_url"
+            curl -fL --retry 3 -H "Authorization: Bearer ${{ github.token }}" -o "$pkgs/native-owner-ufs-rootauth3-candidate.json" "$json_url"
           else
             if [ -f self/prelink-candidate/native-owner-ufs-rootauth3-candidate.macho ] && \
                [ -f self/prelink-candidate/native-owner-ufs-rootauth3-candidate.json ]; then
