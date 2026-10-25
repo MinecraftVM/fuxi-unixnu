@@ -1,0 +1,57 @@
+name: userdata image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  userdata:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+        with:
+          path: self
+          persist-credentials: false
+
+      - name: Check out UniXNU
+        uses: actions/checkout@v4
+        with:
+          repository: UniXNU/UniXNU
+          ref: 1a01c2afa197d975d04da892325c56b6b14aaecb
+          path: unixnu
+          persist-credentials: false
+
+      - name: Check out the device repository
+        uses: actions/checkout@v4
+        with:
+          repository: hanzi123-bilp/unixnu-fuxi
+          ref: d12c0585c7c82941c17e4af6bace12dc46953c85
+          path: device
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Select the device
+        run: |
+          cd unixnu
+          ./unixnu defconfig fuxi_defconfig -D ../device
+
+      - name: Build the userdata image
+        run: |
+          cd unixnu
+          ./unixnu build userdata -D ../device
+
+      - name: Upload the image
+        uses: actions/upload-artifact@v4
+        with:
+          name: userdata-root
+          path: |
+            unixnu/out/fuxi/userdata/userdata-root.img
+            unixnu/out/fuxi/userdata/userdata-root.json
+          retention-days: 7
