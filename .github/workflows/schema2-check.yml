@@ -64,21 +64,23 @@ jobs:
           python3 ./unixnu status --json -D ../device > ../status.json
           head -80 ../status.json
 
-      - name: Report the component catalog
-        run: |
-          echo '--- components'
-          ls unixnu/components 2>/dev/null | head -40 || echo 'no components dir'
-          soc=$(ls -d unixnu/out/feeds/UniXNU-sm8550-common-* 2>/dev/null | head -1)
-          echo "--- soc: $soc"
-          ls "$soc" 2>/dev/null
-          echo '--- soc.toml'
-          head -60 "$soc/soc.toml" 2>/dev/null
-          echo '--- os profile'
-          ls unixnu/profiles/os/ipados-17.7.11-21H461
-          echo '--- tree top'
-          ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree | head -25
 
       - name: Assemble the tree
         run: |
           cd unixnu
           python3 ./unixnu tree -D ../device
+
+      - name: Report the component catalog
+        run: |
+          echo '--- feeds dirs'
+          ls unixnu/out/feeds 2>/dev/null | head -40
+          echo '--- component configs'
+          find unixnu/out/feeds -maxdepth 2 -name 'component.toml' 2>/dev/null | head -20
+          echo '--- unixnu feeds.toml'
+          head -60 unixnu/feeds.toml
+          echo '--- output dir'
+          ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi 2>/dev/null
+          echo '--- tree top'
+          ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree 2>/dev/null | head -30
+          echo '--- tree components'
+          ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree/components 2>/dev/null | head -30
