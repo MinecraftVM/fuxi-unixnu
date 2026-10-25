@@ -359,6 +359,8 @@ jobs:
           if [ -f "$pkgs/native-owner-ufs-rootauth3-candidate.macho" ]; then
             cp "$pkgs/native-owner-ufs-rootauth3-candidate.macho" "$pkgs/native-defaults-candidate.macho"
             cp "$pkgs/native-owner-ufs-rootauth3-candidate.json" "$pkgs/native-defaults-candidate.json"
+            cp "$pkgs/native-owner-ufs-rootauth3-candidate.macho" "$pkgs/native-apfs-load-positive.macho"
+            cp "$pkgs/native-owner-ufs-rootauth3-candidate.json" "$pkgs/native-apfs-load-positive.json"
           fi
           sed -i "s/require(ref_sha == .c487cb1e607a468e26fcc4da93a02a4d30a129360cd3ca9ca88ef3a51f8c8cd9., .Unexpected KDK annotation input.)/pass/" unixnu/scripts/audit-aes-interface.py || true
           mkdir -p device/scripts
