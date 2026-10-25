@@ -99,10 +99,11 @@ jobs:
           print(json.dumps(d['board']['kernel'].get('archives'), indent=1))
           PY
 
-      - name: Install the Linux kernel toolchain
+      - name: Install unifdef
         run: |
-          cd unixnu
-          sudo python3 scripts/linux/setup-toolchain.py
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends unifdef
+          unifdef -V 2>&1 | head -1 || true
 
       - name: Build the kernel
         run: |
