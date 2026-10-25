@@ -21,6 +21,10 @@ jobs:
           path: unixnu
           persist-credentials: false
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
       - name: Record the pinned revision
         run: git -C unixnu log --oneline -1
 
