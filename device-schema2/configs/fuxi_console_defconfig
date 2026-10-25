@@ -1,0 +1,35 @@
+# Experimental console-only configuration for fuxi (stage 2a, fresh CI checkout).
+#
+# Why this file exists: the upstream fuxi_defconfig enables NativeAES and the
+# boot-progress layer, whose archives need a prelink candidate
+# (build/native-prelink/*-candidate.macho) that no repository carries, and it
+# leaves CONFIG_XNU_BUILD_ARCHIVES unset, so the archives the link needs are
+# never built. See docs/FULL-MODE.zh.md.
+#
+# This configuration keeps only what links from source archives:
+#   corecrypto (plain + namespaced), libpthread-kernel, ArmDTPlatform, ArmCpu
+#   and the legacy display stub.
+# Crypto bootstrap stays "prelinked": the original kernelcache provides the
+# closure, the link only adds the namespaced corecrypto archive.
+#
+# Boot progress is NOT enabled: build-xnu-4k-baseline.sh refuses it unless
+# NATIVE_UFS, OWNER_ROOT_AUDIT, NATIVE_VIRTIO_BLOCK and SOURCE_CORECRYPTO14 are
+# all on, and those pull the prelink candidates a fresh checkout does not have.
+# The kernel therefore has no on-screen console by itself; DarwinBoot's handoff
+# logs and UniXNU stay visible, and panic output needs a framebuffer source that
+# a later configuration adds.
+#
+# No NativeAES, no UFS, no Adreno, no owner-root/storage stack.
+
+CONFIG_XNU_BUILD_ARCHIVES=y
+CONFIG_XNU_SOURCE_CORECRYPTO14=y
+CONFIG_XNU_SOURCE_PTHREAD=y
+CONFIG_XNU_SHENG_PMGR=y
+CONFIG_XNU_ARM_DT_PLATFORM=y
+CONFIG_XNU_ARMCPU=y
+CONFIG_XNU_TRUST_CACHE_RUNTIME=y
+CONFIG_XNU_DT_PANIC_REGION=y
+CONFIG_XNU_NATIVE_ARCH_TIMER=y
+CONFIG_XNU_NATIVE_PAN=y
+CONFIG_XNU_EXTRA_LD_ARCHIVES="{tree}/build/legacy-stub/libLegacyStub.a"
+CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"

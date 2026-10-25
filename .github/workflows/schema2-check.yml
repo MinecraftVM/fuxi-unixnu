@@ -1,0 +1,55 @@
+name: schema2 check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: self
+          persist-credentials: false
+
+      - name: Check out UniXNU main
+        uses: actions/checkout@v4
+        with:
+          repository: UniXNU/UniXNU
+          ref: main
+          path: unixnu
+          persist-credentials: false
+
+      - name: Record the pinned revision
+        run: git -C unixnu log --oneline -1
+
+      - name: Prepare the device repository
+        run: |
+          rm -rf device
+          cp -R self/device-schema2 device
+          cd device
+          git init -q
+          git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -qm 'fuxi schema-2 device repository'
+
+      - name: Select the configuration
+        run: |
+          cd unixnu
+          python3 ./unixnu defconfig fuxi_defconfig -D ../device
+
+      - name: Fetch the sources
+        run: |
+          cd unixnu
+          python3 ./unixnu fetch -D ../device
+
+      - name: Show the resolved status
+        run: |
+          cd unixnu
+          python3 ./unixnu status --json -D ../device > ../status.json
+          head -80 ../status.json
+
+      - name: Assemble the tree
+        run: |
+          cd unixnu
+          python3 ./unixnu tree -D ../device

@@ -1,0 +1,120 @@
+schema_version = 1
+
+[device]
+name = "fuxi"
+soc = "SM8550"
+os_profile = "ipados-17.7.11-21H461"
+summary = "Xiaomi 13 (fuxi), SM8550. Port migrated to the schema-2 configuration; drivers and evidence are filled area by area."
+
+[[area]]
+id = "configuration"
+status = "in-progress"
+components = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "DarwinBoot"]
+paths = ["board.toml", "feeds.toml", "configs/**", "dts/**", ".github/**"]
+inputs = ["SM8550 SoC support, iPadOS 17.7.11 profile, fuxi board DTS converted from the vendor FDT."]
+configuration = ["board.toml uses schema_version=2 with the sm8550 source and the ipados-17.7.11-21H461 profile.", "device_tree.source points at dts/fuxi.dts; the vendor FDT was 815045 bytes with model 'Qualcomm Technologies, Inc. 8550 fuxi'."]
+procedure = ["Converted the vendor FDT to dts/fuxi.dts and ran ./unixnu defconfig/fetch/status/tree in CI."]
+findings = ["The pinned UniXNU 1a01c2a predates schema 2; the schema-2 check workflow pins the current main instead."]
+completion = ["defconfig, fetch, status --json and tree resolve with the schema-2 board.toml."]
+limits = ["Component selection beyond the template set is pending; UFS/GPU/input components are not yet enabled."]
+next_action = ["Resolve the schema-2 configuration in CI, then add ShengUfs and the display/input components."]
+evidence = []
+
+[[area]]
+id = "firmware"
+status = "planned"
+components = []
+paths = ["proprietary-files.txt", "scripts/check-fuxi.py"]
+inputs = ["UEFI firmware for fuxi from the uefi-fuxi repository and the Makefile/DSC integration."]
+configuration = ["firmware.config=fuxi, dsc=Platforms/Xiaomi/fuxiPkg/fuxi.dsc."]
+procedure = ["Build the firmware after the configuration resolves."]
+findings = ["The schema-1 pipeline built this firmware successfully in earlier runs."]
+completion = ["Firmware builds and enters UniXNU with the framebuffer published."]
+next_action = ["Re-run the firmware build under schema 2."]
+evidence = []
+
+[[area]]
+id = "cpu"
+status = "planned"
+components = ["ArmCpu"]
+paths = ["dts/fuxi.dts"]
+inputs = ["CPU topology and PSCI method from the vendor FDT."]
+configuration = ["ArmCpu is part of the template component set."]
+procedure = ["Validate SMP bring-up after the configuration resolves."]
+completion = ["All cores come online under UniXNU."]
+next_action = ["Enable and test the CPU component."]
+evidence = []
+
+[[area]]
+id = "storage"
+status = "planned"
+components = []
+paths = ["board.toml", "dts/fuxi.dts"]
+inputs = ["UFS controller at 0x1d84000 (0x3000) and PHY at 0x1d80000 (0x2000) from the vendor FDT."]
+configuration = ["[userdata] windows OS/SystemOS with the iPadOS 17.7.11 disk images."]
+procedure = ["Add the ShengUfs component and the native-ufs-root boot argument."]
+findings = ["A previous schema-1 build reached 'BSD root: ufsroot0' and failed the HFS+ mount with signature 0, so the flashed userdata image must be verified first."]
+completion = ["BSD root mounts ufsroot0 and the userland starts."]
+next_action = ["Flash the SHNGROOT userdata image and enable ShengUfs in schema 2."]
+evidence = []
+
+[[area]]
+id = "display"
+status = "planned"
+components = []
+paths = ["dts/fuxi.dts"]
+inputs = ["mdss_mdp@ae00000, dsi_ctrl0/1 at 0xae94000/0xae96000, dsi_phy0/1 at 0xae95500/0xae97500."]
+configuration = ["Panel power rails from the vendor FDT."]
+procedure = ["Select the GopFramebuffer/display component and verify the panel."]
+completion = ["The framebuffer is published and SpringBoard renders."]
+next_action = ["Choose the display component in schema 2."]
+evidence = []
+
+[[area]]
+id = "input"
+status = "planned"
+components = []
+paths = ["dts/fuxi.dts"]
+inputs = ["Goodix GT9916 touch controller at i2c@a90000 address 0x5d."]
+configuration = ["Touch node present in the vendor FDT; no input component selected yet."]
+procedure = ["Add the Goodix input component and verify events."]
+completion = ["Touch events reach userland."]
+next_action = ["Select the input component in schema 2."]
+evidence = []
+
+[[area]]
+id = "gpu"
+status = "planned"
+components = []
+paths = ["dts/fuxi.dts"]
+inputs = ["Adreno 740 GPU; vendor FDT carries the GPU and GMU nodes."]
+configuration = ["Not linked in the current configuration."]
+procedure = ["Add the Adreno740 component after the kernel boots."]
+findings = ["The schema-1 NativeAdreno build fails with -Werror unused variables in NativeAdrenoService.cpp, so the component is deferred."]
+completion = ["The GPU initializes and Metal works."]
+next_action = ["Fix or replace the NativeAdreno build before enabling it."]
+evidence = []
+
+[[area]]
+id = "network"
+status = "planned"
+components = []
+paths = ["dts/fuxi.dts"]
+inputs = ["WCN6855 Wi-Fi/BT nodes in the vendor FDT."]
+configuration = ["Not configured."]
+procedure = ["Select a network component when available."]
+completion = ["Wi-Fi associates."]
+next_action = ["Inventory the WCN6855 firmware and interfaces."]
+evidence = []
+
+[[area]]
+id = "power"
+status = "planned"
+components = []
+paths = ["dts/fuxi.dts"]
+inputs = ["PM8550/PM8550VS/PM8550VE regulators and PMIC nodes in the vendor FDT."]
+configuration = ["Not configured."]
+procedure = ["Add the power component and verify regulator state."]
+completion = ["Regulators and power domains are managed."]
+next_action = ["Select the power component in schema 2."]
+evidence = []
