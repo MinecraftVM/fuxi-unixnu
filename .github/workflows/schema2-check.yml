@@ -100,7 +100,7 @@ jobs:
       - name: Build the kernel
         run: |
           cd unixnu
-          python3 ./unixnu build kernel -D ../device 2>&1 | tail -100
+          python3 ./unixnu build kernel -D ../device 2>&1 | tee -a ../report.txt | tail -100
 
       - name: Upload the report
         uses: actions/upload-artifact@v4
