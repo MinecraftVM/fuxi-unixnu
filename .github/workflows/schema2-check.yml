@@ -60,22 +60,7 @@ jobs:
 
 
 
-      - name: Package the local workspace
-        run: |
-          mkdir -p local-workspace
-          tar -C . -czf local-workspace/unixnu-main.tar.gz --exclude=unixnu/out --exclude=.git unixnu
-          ( cd unixnu/out/feeds && tar -czf ../../../local-workspace/feeds-min.tar.gz \
-              UniXNU-sm8550-common-* ArmCpu-* ArmDTPlatform-* SoftwareAES-* \
-              XnuPrelink-* DarwinBoot-* ShengUfs-* VirtioMmioBlock-* VerifiedRoot-* \
-              GopFramebuffer-* 2>/dev/null || true )
-          ls -lh local-workspace
 
-      - name: Upload the local workspace
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-workspace
-          path: local-workspace/*.tar.gz
-          retention-days: 7
 
       - name: Show the resolved status
         run: |
