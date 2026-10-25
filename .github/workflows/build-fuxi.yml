@@ -343,10 +343,13 @@ jobs:
             curl -fL --retry 3 -o "$pkgs/native-owner-ufs-rootauth3-candidate.macho" "$macho_url"
             curl -fL --retry 3 -o "$pkgs/native-owner-ufs-rootauth3-candidate.json" "$json_url"
           else
-            test -f self/prelink-candidate/native-owner-ufs-rootauth3-candidate.macho
-            test -f self/prelink-candidate/native-owner-ufs-rootauth3-candidate.json
-            cp self/prelink-candidate/native-owner-ufs-rootauth3-candidate.macho "$pkgs/"
-            cp self/prelink-candidate/native-owner-ufs-rootauth3-candidate.json "$pkgs/"
+            if [ -f self/prelink-candidate/native-owner-ufs-rootauth3-candidate.macho ] && \
+               [ -f self/prelink-candidate/native-owner-ufs-rootauth3-candidate.json ]; then
+              cp self/prelink-candidate/native-owner-ufs-rootauth3-candidate.macho "$pkgs/"
+              cp self/prelink-candidate/native-owner-ufs-rootauth3-candidate.json "$pkgs/"
+            else
+              echo "::warning::prelink candidate missing in the checkout; archives may fail"
+            fi
           fi
           ls -l "$pkgs"
 
