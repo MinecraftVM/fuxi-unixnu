@@ -81,8 +81,12 @@ jobs:
             head -40 unixnu/out/feeds/UniXNU-sm8550-common-*/soc.toml
             echo '--- tree top'
             ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree 2>/dev/null | head -30
-            echo '--- tree components'
-            ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree/components 2>/dev/null | head -30
+            echo '--- components.toml'
+            cat unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree/components.toml 2>/dev/null
+            echo '--- tree drivers'
+            ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree/drivers 2>/dev/null
+            echo '--- tree kits'
+            ls unixnu/out/fuxi/ipados-17.7.11-21H461/fuxi/tree/kits 2>/dev/null
           } | tee report.txt
 
       - name: Upload the report
