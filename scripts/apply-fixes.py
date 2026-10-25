@@ -45,6 +45,7 @@ CONSOLE_ARCHIVES = [
     "build-corecrypto-14.py --namespace",
     "build-arm-driver.py ArmDTPlatform",
     "build-arm-driver.py ArmCpu",
+    "build-arm-driver.py NativeUfs",
     "build-libpthread-kernel.py",
     "build-legacy-stub.py",
 ]

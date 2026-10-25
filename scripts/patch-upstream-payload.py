@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+GPU_SCRATCH = 0x9fe000000
+GPU_SIZE = 0x02000000
 sys.path.insert(0, str(HERE / ".." / ".." / ".scratch" / "ios-fuxi" / "tools"))
 
 
@@ -28,6 +30,7 @@ def main() -> int:
     parser.add_argument("--root-bytes", type=int, required=True)
     parser.add_argument("--extent", action="append", default=[],
                         help="file,partition,count in 4 KiB blocks (repeatable)")
+    parser.add_argument("--gpu-reserve", action="store_true")
     parser.add_argument("--cmdline")
     args = parser.parse_args()
 
@@ -57,6 +60,10 @@ def main() -> int:
              if k not in ("fuxi-root-extents", "fuxi-root-blocks")]
     props.append(("fuxi-root-extents", 0, struct.pack(f"<{len(words)}Q", *words)))
     props.append(("fuxi-root-blocks", 0, struct.pack("<Q", blocks)))
+    if args.gpu_reserve:
+        base = GPU_SCRATCH
+        props = [(k, f, v) for (k, f, v) in props if k != "fuxi-gpu-memory"]
+        props.append(("fuxi-gpu-memory", 0, struct.pack("<2Q", base, GPU_SIZE)))
     chosen.props = props
 
     blob = adt.serialize(root)
