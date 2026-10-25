@@ -1,0 +1,41 @@
+name: UniXNU probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out UniXNU main
+        uses: actions/checkout@v4
+        with:
+          repository: UniXNU/UniXNU
+          ref: main
+          path: unixnu
+          persist-credentials: false
+
+      - name: Report the schema
+        run: |
+          cd unixnu
+          git log --oneline -3
+          echo '--- top level'
+          ls
+          echo '--- profiles'
+          ls profiles 2>/dev/null | head -10 || echo 'no profiles'
+          echo '--- scripts'
+          ls scripts | head -15
+          echo '--- cli'
+          python3 ./unixnu --help 2>&1 | head -25
+          echo '--- status help'
+          python3 ./unixnu status --help 2>&1 | head -15
+
+      - name: Show the example device
+        run: |
+          cd unixnu/examples/device
+          echo '--- files'
+          find . -maxdepth 2 -type f | sort
+          echo '--- board.toml'
+          head -80 board.toml
+          echo '--- porting.toml'
+          head -40 porting.toml 2>/dev/null || echo 'no porting.toml'
