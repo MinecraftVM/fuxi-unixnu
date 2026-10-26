@@ -62,6 +62,15 @@ jobs:
           cp "$src" "$tree/.cache/firmware/target-volumes/044-76040-038.dmg"
           ls -l "$tree/.cache/firmware/target-volumes"
 
+      - name: Attach the OS image read-only
+        run: |
+          tree=$(ls -d unixnu/out/fuxi/*/fuxi/tree | head -1)
+          vol="$tree/.cache/firmware/target-volumes/os-mount"
+          mkdir -p "$vol"
+          hdiutil attach -readonly -noverify -noautofsck -mountpoint "$vol" \
+            "$tree/.cache/firmware/target-volumes/044-76040-038.dmg"
+          hdiutil info | head -20
+
       - name: Build the verification policy
         run: |
           tree=$(ls -d unixnu/out/fuxi/*/fuxi/tree | head -1)
