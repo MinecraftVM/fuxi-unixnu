@@ -62,6 +62,15 @@ jobs:
           cp "$src" "$tree/.cache/firmware/target-volumes/044-76040-038.dmg"
           ls -l "$tree/.cache/firmware/target-volumes"
 
+      - name: Generate the owner key
+        run: |
+          tree=$(ls -d unixnu/out/fuxi/*/fuxi/tree | head -1)
+          keys="$tree/build/verified-root-host/keys"
+          mkdir -p "$keys"
+          openssl genrsa -out "$keys/owner.pem" 2048
+          openssl rsa -in "$keys/owner.pem" -pubout -out "$keys/owner-public.pem"
+          ls -l "$keys"
+
       - name: Attach the OS image read-only
         run: |
           tree=$(ls -d unixnu/out/fuxi/*/fuxi/tree | head -1)
@@ -81,5 +90,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: verification-policy
-          path: unixnu/out/fuxi/*/fuxi/tree/build/verified-root-os/
+          path: |
+            unixnu/out/fuxi/*/fuxi/tree/build/verified-root-os/
+            unixnu/out/fuxi/*/fuxi/tree/build/verified-root-host/keys/
           retention-days: 7
