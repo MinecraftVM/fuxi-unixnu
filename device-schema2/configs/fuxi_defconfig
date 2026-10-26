@@ -1,23 +1,19 @@
-# Stage 2a: console only. No storage stack, so the archive step never needs
-# build/storage-abi, which cannot be produced before the prelink it depends on.
-
+# Xiaomi 13 (fuxi) schema-2: UFS root through ShengUfs with the audited storage ABI.
 CONFIG_XNU_SOURCE_CORECRYPTO14=y
 CONFIG_XNU_SOURCE_PTHREAD=y
 CONFIG_XNU_ARM_DT_PLATFORM=y
 CONFIG_XNU_ARMCPU=y
 CONFIG_XNU_NATIVE_AES=y
+CONFIG_XNU_NATIVE_UFS=y
+CONFIG_XNU_NATIVE_VIRTIO_BLOCK=y
+CONFIG_XNU_VERIFIED_ROOT_PROBE=y
+CONFIG_XNU_OWNER_ROOT_AUDIT=y
+CONFIG_XNU_BOOT_PROGRESS=y
 CONFIG_XNU_TRUST_CACHE_RUNTIME=y
 CONFIG_XNU_DT_PANIC_REGION=y
 CONFIG_XNU_NATIVE_ARCH_TIMER=y
 CONFIG_XNU_NATIVE_PAN=y
-CONFIG_XNU_BOOT_PROGRESS=y
-# No storage stack yet. Linking NativeUfs needs the original IOBlockStorageDevice
-# class (constructor, destructor, vtable and six virtual entries) resolved to the
-# addresses inside the prelinked kernelcache, and those come from
-# audit-storage-interface.py's live capture, which no repository carries. With the
-# driver off, boot progress draws zero block counts; the kernel still boots and
-# reports the missing root on screen.
-# UFS needs the IOStorageFamily symbols that only exist after prelink.
-CONFIG_XNU_NATIVE_UFS=n
 CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"
+CONFIG_XNU_VERIFIED_ROOT_ARCHIVE="{tree}/build/verified-root-os-xnu/libVerifiedRootProbe.a"
 CONFIG_XNU_EXTRA_LD_ARCHIVES="{tree}/build/legacy-stub/libLegacyStub.a"
+CONFIG_XNU_NATIVE_ADRENO=n

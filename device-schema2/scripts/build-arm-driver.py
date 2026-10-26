@@ -2,18 +2,27 @@
 """Compile the generic platform expert against the actual source-kernel ABI."""
 import argparse
 import json
+import tomllib
 from pathlib import Path
 import struct
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('component', choices=['ArmVirtPlatform', 'ArmDTPlatform', 'ArmCpu', 'NativeAES', 'NativeVirtioBlock', 'NativeRamBlock', 'NativeMobileDisplay', 'NativeVirtioConsole', 'NativeLegacyDisplay', 'NativeGOPPresenter', 'NativeOfflineGPU', 'NativeOfflineAccelerator', 'NativeIOGPUProviderProbe', 'NativeUfs', 'NativeHidInput', 'NativeKeyStoreEvents', 'NativeAdreno'])
+catalog = {entry['id']: entry for entry in tomllib.loads((ROOT / 'components.toml').read_text())['component']
+           if entry['kind'] == 'driver' and any(name.endswith('.cpp') for name in entry.get('source_files', []))}
+aliases = {entry.get('legacy_name', identifier): identifier for identifier, entry in catalog.items()}
+auxiliary = ['NativeLegacyDisplay', 'NativeGOPPresenter', 'NativeOfflineGPU', 'NativeOfflineAccelerator', 'NativeIOGPUProviderProbe']
+parser.add_argument('component', choices=sorted(set(catalog) | set(aliases) | set(auxiliary)))
 parser.add_argument('--negative-aes-kat', action='store_true', help='Isolated own-source wrong-answer refusal control; never changes original inputs')
 parser.add_argument('--verified-root', action='store_true', help='Authenticate all actual disk reads against an independently signed immutable policy')
 parser.add_argument('--verified-root-bundle', action='store_true', help='Select exactly one capacity-matching policy per device, then independently authenticate it')
 parser.add_argument('--negative-verified-block', action='store_true', help='Negative own-buffer control: corrupt only the completed DMA snapshot')
 args = parser.parse_args()
+identifier = aliases.get(args.component, args.component)
+metadata = catalog.get(identifier, {})
+runtime = metadata.get('legacy_name', identifier)
+args.component = runtime
 if args.verified_root_bundle and not args.verified_root:
     parser.error('A policy bundle requires verified block mode')
 if args.verified_root_bundle and args.negative_verified_block:
@@ -25,20 +34,24 @@ if args.negative_verified_block and not args.verified_root:
 component = args.component
 recipe = ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json'
 record = json.loads(recipe.read_text().strip().rstrip(','))
-source = ROOT / 'drivers' / ('NativeMobileDisplay' if component in ('NativeLegacyDisplay','NativeGOPPresenter') else 'NativeMetal' if component in ('NativeOfflineGPU','NativeOfflineAccelerator','NativeIOGPUProviderProbe') else component) / {'NativeAdreno':'NativeAdrenoService.cpp'}.get(component, component + '.cpp')
-out = ROOT / 'build' / {'ArmVirtPlatform': 'armvirt-platform', 'ArmDTPlatform': 'armdt-platform', 'ArmCpu': 'armcpu', 'NativeAES': 'native-aes',
-                        'NativeVirtioBlock': 'native-virtio-block', 'NativeRamBlock': 'native-ram-block',
-                        'NativeMobileDisplay': 'native-mobile-display', 'NativeVirtioConsole': 'native-virtio-console',
-                        'NativeLegacyDisplay': 'native-legacy-display', 'NativeGOPPresenter': 'native-gop-presenter', 'NativeOfflineGPU':'native-offline-gpu','NativeOfflineAccelerator':'native-offline-accelerator','NativeIOGPUProviderProbe':'native-original-provider', 'NativeUfs':'native-ufs', 'NativeHidInput':'native-hid-input', 'NativeKeyStoreEvents':'native-keystore-events', 'NativeAdreno':'native-adreno'}[component]
+directory = 'GopFramebuffer' if runtime in ('NativeLegacyDisplay', 'NativeGOPPresenter') else 'AdrenoMetal' if runtime in ('NativeOfflineGPU', 'NativeOfflineAccelerator', 'NativeIOGPUProviderProbe') else identifier
+filename = next((name for name in metadata.get('source_files', []) if name.endswith('.cpp')), runtime + '.cpp')
+source = ROOT / 'drivers' / directory / filename
+outputs = metadata.get('outputs', [])
+archive_output = next((path for path in outputs if path.endswith('.a')), None)
+aux_dirs = {'NativeLegacyDisplay':'native-legacy-display', 'NativeGOPPresenter':'native-gop-presenter',
+            'NativeOfflineGPU':'native-offline-gpu', 'NativeOfflineAccelerator':'native-offline-accelerator',
+            'NativeIOGPUProviderProbe':'native-original-provider'}
+out = ROOT / Path(archive_output or outputs[0]).parent if outputs else ROOT / 'build' / aux_dirs[runtime]
 if args.verified_root:
-    out = ROOT / ('build/native-virtio-block-verified-fault' if args.negative_verified_block else 'build/native-virtio-block-verified')
+    out = ROOT / ('build/virtio-mmio-block-verified-fault' if args.negative_verified_block else 'build/virtio-mmio-block-verified')
     if args.verified_root_bundle:
-        out = ROOT / 'build/native-virtio-block-verified-bundle'
+        out = ROOT / 'build/virtio-mmio-block-verified-bundle'
 out.mkdir(parents=True, exist_ok=True)
 if args.negative_aes_kat:
     if component != 'NativeAES':
         parser.error('The own-source KAT control requires NativeAES')
-    out = ROOT / 'build/native-aes-kat-negative'
+    out = ROOT / 'build/software-aes-kat-negative'
     out.mkdir(parents=True, exist_ok=True)
     text = source.read_text()
     marker = '0x76,0x49,0xab,0xac'
@@ -63,8 +76,7 @@ while index < len(arguments):
     elif not value.startswith('-W'):
         command.append(value)
     index += 1
-command.extend(['-Wall', '-Wextra', '-Werror', '-Wno-unknown-warning-option',
-                '-Wno-unused-parameter',
+command.extend(['-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                 '-Wno-c99-designator', '-Wno-reorder-init-list', '-Wno-deprecated-enum-enum-conversion',
                 '-Wno-unnecessary-virtual-specifier', '-I', str(ROOT / '.cache/xnu-work/osfmk')])
 if component in ('NativeVirtioBlock', 'NativeRamBlock', 'NativeUfs'):
@@ -76,16 +88,16 @@ if component in ('NativeVirtioBlock', 'NativeRamBlock', 'NativeUfs'):
     if args.verified_root_bundle:
         command += ['-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1']
 if component == 'NativeUfs':
-    command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-I', str(ROOT / 'drivers/NativeVirtioBlock'),
+    command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-I', str(ROOT / 'drivers/VirtioMmioBlock'),
                 '-DNATIVE_VERIFIED_BLOCK=1', '-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1', '-mgeneral-regs-only']
 if component=='NativeOfflineGPU':
-    command += ['-I',str(ROOT/'drivers/NativeVirtioConsole')]
+    command += ['-I',str(ROOT/'drivers/VirtioMmioConsole')]
 if component in ('NativeLegacyDisplay','NativeHidInput'):
     command += ['-I', str(out)]
 if component == 'NativeAdreno':
     command += ['-I', str(ROOT / 'kits/ArmSmmu4K'), '-I', str(ROOT / 'kits/AdrenoPM4'),
-                '-I', str(ROOT / 'kits/sheng'), '-I', str(ROOT / 'kits/AdrenoFirmware'),
-                '-I', str(ROOT / 'build/sheng-gmu')]
+                '-I', str(ROOT / 'kits/sheng'), '-I', str(ROOT / 'kits/Sm8550Platform'), '-I', str(ROOT / 'kits/AdrenoFirmware'),
+                '-I', str(ROOT / 'build/sheng-gmu'), '-I', str(ROOT / 'build/adreno740/include')]
 (out / 'compile-command.json').write_text(json.dumps(command, indent=2) + '\n')
 result = subprocess.run(command, cwd=record['directory'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 (out / 'compile.log').write_text(result.stdout)
@@ -104,7 +116,7 @@ for _ in range(count):
     offset += length
 if deployment != (2, 0x110000):
     raise SystemExit(f'Unexpected platform deployment {deployment}')
-archive = out / ('lib' + component + '.a')
+archive = out / ('lib' + identifier + '.a')
 archive.unlink(missing_ok=True)
 subprocess.run(['xcrun', 'ar', 'rcs', archive, destination], check=True)
-print(f'{component}: -Werror build and actual ARM64/iOS 17 object audit passed')
+print(f'{identifier}: -Werror build and actual ARM64/iOS 17 object audit passed')

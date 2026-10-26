@@ -1,0 +1,63 @@
+name: verification policy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  policy:
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: self, persist-credentials: false }
+
+      - name: Check out UniXNU main
+        uses: actions/checkout@v4
+        with: { repository: UniXNU/UniXNU, ref: main, path: unixnu, persist-credentials: false }
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+
+      - name: Prepare the device repository
+        run: |
+          rm -rf device
+          cp -R self/device-schema2 device
+          cd device && git init -q && git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm init
+
+      - name: Select and fetch
+        run: |
+          cd unixnu
+          python3 ./unixnu defconfig fuxi_defconfig -D ../device
+          python3 ./unixnu fetch -D ../device
+
+      - name: Assemble the tree
+        run: cd unixnu && python3 ./unixnu tree -D ../device
+
+      - name: Extract the OS disk image from the IPSW
+        run: |
+          cd unixnu
+          python3 ./unixnu ipsw OS -D ../device || true
+          ls out/ipsw/21H461 2>/dev/null || ls out/ipsw 2>/dev/null
+
+      - name: Place the OS image
+        run: |
+          tree=$(ls -d unixnu/out/fuxi/*/fuxi/tree | head -1)
+          mkdir -p "$tree/.cache/firmware/target-volumes"
+          src=$(ls unixnu/out/ipsw/21H461/044-76040-038.dmg 2>/dev/null | head -1)
+          if [ -z "$src" ]; then src=$(ls unixnu/out/ipsw/21H461/*.dmg 2>/dev/null | head -1); fi
+          test -n "$src"
+          cp "$src" "$tree/.cache/firmware/target-volumes/044-76040-038.dmg"
+          ls -l "$tree/.cache/firmware/target-volumes"
+
+      - name: Build the verification policy
+        run: |
+          tree=$(ls -d unixnu/out/fuxi/*/fuxi/tree | head -1)
+          cd "$tree"
+          python3 scripts/build-owner-os-policy.py
+
+      - name: Upload the policy
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-policy
+          path: unixnu/out/fuxi/*/fuxi/tree/build/verified-root-os/
+          retention-days: 7

@@ -17,14 +17,19 @@ defconfig = "fuxi_defconfig"
 archives = [
   "build-corecrypto-14.py",
   "build-corecrypto-14.py --namespace",
+  "full-ufs-audit-aes.py",
+  "full-ufs-audit-storage.py",
   "component:ArmDTPlatform",
   "component:ArmCpu",
   "component:SoftwareAES",
-  "component:ShengUfs",
   "component:VirtioMmioBlock",
+  "build-native-virtio-bindings.py",
+  "component:ShengUfs",
+  "build-ufs-storage-bindings.py",
   "build-software-aes-bindings.py",
   "build-mockfs-fixture.py",
   "build-libpthread-kernel.py",
+  "build-legacy-stub.py",
 ]
 config_fragments = ["arch:configs/common.config", "soc:configs/sm8550.config", "os:configs/ipados.config"]
 patch_series = ["arch:patches/xnu/series", "soc:patches/xnu/series", "os:patches/xnu/series", "device:patches/xnu/series"]
