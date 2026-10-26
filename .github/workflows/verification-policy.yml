@@ -49,7 +49,7 @@ jobs:
       - name: Extract the OS disk image from the IPSW
         run: |
           cd unixnu
-          python3 ./unixnu ipsw OS -D ../device || true
+          python3 ./unixnu ipsw fetch OS -D ../device || true
           ls out/ipsw/21H461 2>/dev/null || ls out/ipsw 2>/dev/null
 
       - name: Place the OS image
