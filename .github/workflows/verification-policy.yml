@@ -67,7 +67,7 @@ jobs:
           tree=$(ls -d unixnu/out/fuxi/*/fuxi/tree | head -1)
           keys="$tree/build/verified-root-host/keys"
           mkdir -p "$keys"
-          openssl genrsa -out "$keys/owner.pem" 2048
+          openssl genrsa -out "$keys/owner.pem" 3072
           openssl rsa -in "$keys/owner.pem" -pubout -out "$keys/owner-public.pem"
           ls -l "$keys"
 
