@@ -91,27 +91,26 @@ jobs:
           marker = "raise SystemExit('Actual complete original OS digest differs')"
           end = t.index(marker) + len(marker)
           replacement = '''view = View()
-view.image_bytes = info['TotalSize']
-view.block_count = (view.image_bytes + 4095) // 4096
-view.generation = 1
-view.volume_uuid = expected_uuid.bytes
-complete = hashlib.sha256()
-indices = [0, 1, view.block_count // 2, view.block_count - 1]
-samples, lengths = [], []
-with disk.open('rb', buffering=1024 * 1024) as stream:
-    for index in range(view.block_count):
-        block = stream.read(min(4096, view.image_bytes - index * 4096))
-        complete.update(block)
-        if index in indices:
-            samples.append(block.ljust(4096, b'\\0'))
-            lengths.append(len(block))
-    if stream.read(1):
-        raise SystemExit('Virtual media exceeded its authenticated exact bounds')'''
+      view.image_bytes = info['TotalSize']
+      view.block_count = (view.image_bytes + 4095) // 4096
+      view.generation = 1
+      view.volume_uuid = expected_uuid.bytes
+      complete = hashlib.sha256()
+      indices = [0, 1, view.block_count // 2, view.block_count - 1]
+      samples, lengths = [], []
+      with disk.open('rb', buffering=1024 * 1024) as stream:
+          for index in range(view.block_count):
+              block = stream.read(min(4096, view.image_bytes - index * 4096))
+              complete.update(block)
+              if index in indices:
+                  samples.append(block.ljust(4096, b'\\0'))
+                  lengths.append(len(block))
+          if stream.read(1):
+              raise SystemExit('Virtual media exceeded its authenticated exact bounds')'''
           t = t[:start] + replacement + t[end:]
           open(p, 'w').write(t)
           print('policy patched')
           PY
-
       - name: Build the verification policy
         run: |
           tree=$(ls -d unixnu/out/fuxi/*/fuxi/tree | head -1)
