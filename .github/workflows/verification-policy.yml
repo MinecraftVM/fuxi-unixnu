@@ -24,6 +24,19 @@ jobs:
           cp -R self/device-schema2 device
           cd device && git init -q && git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm init
 
+      - name: Pin the SM8550 SoC source
+        run: |
+          sha=$(git ls-remote https://github.com/UniXNU/UniXNU-sm8550-common refs/heads/main | cut -f1)
+          echo "sm8550 main commit: $sha"
+          test -n "$sha"
+          python3 - "$sha" <<'PY'
+          import pathlib, sys
+          sha = sys.argv[1]
+          p = pathlib.Path('device/feeds.toml')
+          p.write_text(p.read_text().replace('ref = "main"', f'commit = "{sha}"'))
+          PY
+          grep -A2 'name = "sm8550"' device/feeds.toml
+
       - name: Select and fetch
         run: |
           cd unixnu
