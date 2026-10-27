@@ -95,7 +95,7 @@ jobs:
               "view.image_bytes = info['TotalSize']",
               'view.block_count = (view.image_bytes + 4095) // 4096',
               'view.generation = 1',
-              'view.volume_uuid = expected_uuid.bytes',
+              'view.volume_uuid = (ctypes.c_uint8 * 16).from_buffer_copy(expected_uuid.bytes)',
               'complete = hashlib.sha256()',
               'indices = [0, 1, view.block_count // 2, view.block_count - 1]',
               'samples, lengths = [], []',
