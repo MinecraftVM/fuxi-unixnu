@@ -104,7 +104,7 @@ jobs:
               '        block = stream.read(min(4096, view.image_bytes - index * 4096))',
               '        complete.update(block)',
               '        if index in indices:',
-              "            samples.append(block.ljust(4096, b'\\\\0'))",
+              "            samples.append(block.ljust(4096, bytes(1)))",
               '            lengths.append(len(block))',
               '    if stream.read(1):',
               "        raise SystemExit('Virtual media exceeded its authenticated exact bounds')",
